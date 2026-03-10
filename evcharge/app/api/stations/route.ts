@@ -15,9 +15,10 @@ export async function GET(request: Request) {
         const lng = searchParams.get("lng");
         const radius = parseFloat(searchParams.get("radius") || "50");
         const availableOnly = searchParams.get("availableOnly") === "true";
+        const all = searchParams.get("all") === "true";
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const filter: any = { isApproved: true };
+        const filter: any = all ? {} : { isApproved: true };
 
         if (city) filter.city = new RegExp(city, "i");
         if (chargerType) filter.chargerType = chargerType;
@@ -70,20 +71,21 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const user = await getAuthUser();
-        if (!user || user.role !== "STATION_OWNER") {
+        if (!user || (user.role !== "STATION_OWNER" && user.role !== "ADMIN")) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
         }
 
         await dbConnect();
         const body = await request.json();
+        const isAdmin = user.role === "ADMIN";
         const station = await Station.create({
             ...body,
-            ownerId: user.userId,
-            isApproved: false,
+            ownerId: body.ownerId || user.userId,
+            isApproved: isAdmin ? true : false,
         });
 
         return NextResponse.json(
-            { station, message: "Station created. Awaiting admin approval." },
+            { station, message: isAdmin ? "Station created and approved." : "Station created. Awaiting admin approval." },
             { status: 201 }
         );
     } catch (error: unknown) {

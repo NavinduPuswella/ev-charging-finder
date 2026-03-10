@@ -45,8 +45,13 @@ export async function PUT(
         const { id } = await params;
         const body = await request.json();
 
+        // Admin can edit any station; owners can only edit their own
+        const query = user.role === "ADMIN"
+            ? { _id: id }
+            : { _id: id, ownerId: user.userId };
+
         const station = await Station.findOneAndUpdate(
-            { _id: id, ownerId: user.userId },
+            query,
             body,
             { new: true, runValidators: true }
         );

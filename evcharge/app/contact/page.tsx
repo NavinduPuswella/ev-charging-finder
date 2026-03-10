@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import Aurora from "@/components/Aurora";
 import {
     Zap,
     Mail,
@@ -39,17 +40,23 @@ export default function ContactPage() {
     return (
         <div className="flex flex-col">
             {/* Hero Section */}
-            <section className="relative overflow-hidden bg-gradient-to-br from-green-50 via-white to-green-50">
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSA2MCAwIEwgMCAwIDAgNjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgwLDAsMCwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50" />
-                <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8 text-center">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary mb-6">
-                        <Zap className="h-4 w-4" />
-                        Contact Us
-                    </div>
-                    <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-                        Get in <span className="text-primary">Touch</span>
+            <section className="relative overflow-hidden bg-black min-h-[350px] flex items-center justify-center">
+                {/* Aurora Background */}
+                <div className="absolute inset-0 z-0">
+                    <Aurora
+                        colorStops={["#7cff67", "#ff1ad5", "#2986ff"]}
+                        blend={0.5}
+                        amplitude={1.0}
+                        speed={1}
+                    />
+                </div>
+                {/* Dark overlay for text readability */}
+                <div className="absolute inset-0 bg-black/30 z-[1]" />
+                <div className="relative z-10 mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8 text-center">
+                    <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
+                        Get in <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">Touch</span>
                     </h1>
-                    <p className="mt-6 text-lg leading-8 text-muted-foreground max-w-3xl mx-auto">
+                    <p className="mt-6 text-lg leading-8 text-white/70 max-w-3xl mx-auto">
                         Have questions, feedback, or need support? We&apos;d love to hear
                         from you. Our team is here to help.
                     </p>

@@ -15,7 +15,14 @@ export async function GET() {
         await dbConnect();
 
         let bookings;
-        if (user.role === "STATION_OWNER") {
+        if (user.role === "ADMIN") {
+            // Admin sees all bookings
+            bookings = await Booking.find()
+                .populate("userId", "name email")
+                .populate("stationId", "name city")
+                .populate("slotId")
+                .sort({ createdAt: -1 });
+        } else if (user.role === "STATION_OWNER") {
             // Get bookings for owner's stations
             const stations = await Station.find({ ownerId: user.userId });
             const stationIds = stations.map((s) => s._id);

@@ -30,7 +30,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
 
     return (
-        <div className="flex min-h-[calc(100vh-4rem)]">
+        <div className="flex min-h-[calc(100vh-4rem)] mt-16">
             <Sidebar role="ADMIN" />
             <div className="flex-1 bg-muted/30"><div className="p-6 lg:p-8">{children}</div></div>
         </div>

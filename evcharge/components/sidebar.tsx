@@ -11,8 +11,8 @@ import {
     DollarSign,
     Users,
     ShieldCheck,
-    BarChart3,
     BookOpen,
+    Star,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -33,11 +33,11 @@ const menuItems = {
         { href: "/owner/revenue", label: "Revenue", icon: DollarSign },
     ],
     ADMIN: [
-        { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/admin", label: "Overview", icon: LayoutDashboard },
         { href: "/admin/stations", label: "Stations", icon: ShieldCheck },
-        { href: "/admin/users", label: "Users", icon: Users },
         { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck },
-        { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+        { href: "/admin/users", label: "Users", icon: Users },
+        { href: "/admin/reviews", label: "Reviews", icon: Star },
     ],
 };
 
@@ -59,8 +59,8 @@ export default function Sidebar({ role }: SidebarProps) {
                                 key={href}
                                 href={href}
                                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${isActive
-                                        ? "bg-primary text-primary-foreground shadow-sm"
-                                        : "text-sidebar-foreground hover:bg-sidebar-accent"
+                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                    : "text-sidebar-foreground hover:bg-sidebar-accent"
                                     }`}
                             >
                                 <Icon className="h-4 w-4" />
