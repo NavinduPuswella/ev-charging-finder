@@ -50,9 +50,11 @@ interface Station {
     address?: string;
     chargerType: string;
     totalSlots: number;
+    totalChargingPoints?: number;
     pricePerKwh: number;
     rating: number;
     isApproved: boolean;
+    status?: "AVAILABLE" | "LIMITED" | "MAINTENANCE" | "INACTIVE";
     description?: string;
     location: { latitude: number; longitude: number };
 }
@@ -67,6 +69,7 @@ const emptyForm = {
     latitude: "",
     longitude: "",
     description: "",
+    status: "AVAILABLE",
 };
 
 export default function StationsManagementPage() {
@@ -78,7 +81,9 @@ export default function StationsManagementPage() {
         name: "",
         address: "",
         chargerType: "",
+        totalChargingPoints: 0,
         pricePerKwh: 0,
+        status: "AVAILABLE",
     });
     const [dialogOpen, setDialogOpen] = useState(false);
     const [form, setForm] = useState(emptyForm);
@@ -148,7 +153,9 @@ export default function StationsManagementPage() {
             name: s.name,
             address: s.address || "",
             chargerType: s.chargerType,
+            totalChargingPoints: s.totalChargingPoints || s.totalSlots,
             pricePerKwh: s.pricePerKwh,
+            status: s.status || "AVAILABLE",
         });
     };
 
@@ -161,7 +168,10 @@ export default function StationsManagementPage() {
                     name: editForm.name,
                     address: editForm.address,
                     chargerType: editForm.chargerType,
+                    totalChargingPoints: editForm.totalChargingPoints,
+                    totalSlots: editForm.totalChargingPoints,
                     pricePerKwh: editForm.pricePerKwh,
+                    status: editForm.status,
                 }),
             });
             setEditingId(null);
@@ -207,8 +217,10 @@ export default function StationsManagementPage() {
                     city: form.city,
                     address: form.address,
                     chargerType: form.chargerType,
+                    totalChargingPoints: Number(form.totalSlots),
                     totalSlots: Number(form.totalSlots),
                     pricePerKwh: Number(form.pricePerKwh),
+                    status: form.status,
                     location: {
                         latitude: Number(form.latitude),
                         longitude: Number(form.longitude),
@@ -352,7 +364,7 @@ export default function StationsManagementPage() {
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2">
-                                    <Label>Total Slots</Label>
+                                    <Label>Total Charging Points</Label>
                                     <Input
                                         type="number"
                                         placeholder="e.g. 4"
@@ -375,6 +387,25 @@ export default function StationsManagementPage() {
                                         }
                                         required
                                     />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Status</Label>
+                                    <Select
+                                        value={form.status}
+                                        onValueChange={(v) =>
+                                            setForm({ ...form, status: v })
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="AVAILABLE">Available</SelectItem>
+                                            <SelectItem value="LIMITED">Limited</SelectItem>
+                                            <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                                            <SelectItem value="INACTIVE">Inactive</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
@@ -470,6 +501,7 @@ export default function StationsManagementPage() {
                                 <TableHead>Station Name</TableHead>
                                 <TableHead>Address / City</TableHead>
                                 <TableHead>Charger Type</TableHead>
+                                <TableHead className="text-right">Charging Points</TableHead>
                                 <TableHead className="text-right">
                                     Price (LKR/kWh)
                                 </TableHead>
@@ -550,6 +582,26 @@ export default function StationsManagementPage() {
                                         {editingId === s._id ? (
                                             <Input
                                                 type="number"
+                                                min="1"
+                                                value={editForm.totalChargingPoints}
+                                                onChange={(e) =>
+                                                    setEditForm({
+                                                        ...editForm,
+                                                        totalChargingPoints: Number(e.target.value),
+                                                    })
+                                                }
+                                                className="h-8 text-sm w-20 ml-auto"
+                                            />
+                                        ) : (
+                                            <span className="font-semibold">
+                                                {s.totalChargingPoints || s.totalSlots}
+                                            </span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {editingId === s._id ? (
+                                            <Input
+                                                type="number"
                                                 value={editForm.pricePerKwh}
                                                 onChange={(e) =>
                                                     setEditForm({
@@ -561,13 +613,13 @@ export default function StationsManagementPage() {
                                             />
                                         ) : (
                                             <span className="font-semibold">
-                                                Rs. {s.pricePerKwh}
+                                                LKR {s.pricePerKwh}
                                             </span>
                                         )}
                                     </TableCell>
                                     <TableCell>
                                         <Badge variant={s.isApproved ? "success" : "destructive"}>
-                                            {s.isApproved ? "Approved" : "Disabled"}
+                                            {s.isApproved ? (s.status || "AVAILABLE") : "Disabled"}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">

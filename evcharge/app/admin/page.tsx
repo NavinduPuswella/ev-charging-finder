@@ -8,6 +8,7 @@ interface Analytics {
     totalUsers: number;
     totalStations: number;
     totalBookings: number;
+    confirmedBookings: number;
     completedBookings: number;
     cancelledBookings: number;
     totalRevenue: number;
@@ -50,8 +51,6 @@ export default function AdminOverview() {
         );
     }
 
-    const confirmedBookings = analytics.totalBookings - analytics.completedBookings - analytics.cancelledBookings;
-
     const kpis: KPI[] = [
         {
             label: "Total Stations",
@@ -76,7 +75,7 @@ export default function AdminOverview() {
         },
         {
             label: "Total Revenue",
-            value: `$${analytics.totalRevenue.toLocaleString()}`,
+            value: `LKR ${analytics.totalRevenue.toLocaleString()}`,
             icon: DollarSign,
             color: "text-rose-600",
             bgColor: "bg-rose-50",
@@ -132,7 +131,7 @@ export default function AdminOverview() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-muted-foreground">Confirmed</p>
-                                <p className="text-2xl font-bold text-emerald-600">{confirmedBookings}</p>
+                                <p className="text-2xl font-bold text-emerald-600">{analytics.confirmedBookings}</p>
                             </div>
                             <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center">
                                 <CalendarCheck className="h-5 w-5 text-emerald-600" />

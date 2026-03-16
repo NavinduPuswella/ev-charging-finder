@@ -14,10 +14,17 @@ interface Booking {
     _id: string;
     userId?: { name: string; email: string };
     stationId?: { name: string; city: string };
-    date: string;
-    duration: number;
-    status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+    stationName?: string;
+    city?: string;
+    bookingDate?: string;
+    startTime: string;
+    endTime: string;
+    durationHours: number;
+    chargerType?: string;
+    pricePerKwh?: number;
+    status: "CONFIRMED" | "CANCELLED" | "COMPLETED";
     amount: number;
+    createdAt: string;
 }
 
 export default function BookingsPage() {
@@ -38,7 +45,9 @@ export default function BookingsPage() {
             bookings.filter(
                 (b) =>
                     (b.stationId?.name || "").toLowerCase().includes(search.toLowerCase()) ||
-                    (b.userId?.name || "").toLowerCase().includes(search.toLowerCase())
+                    (b.stationName || "").toLowerCase().includes(search.toLowerCase()) ||
+                    (b.userId?.name || "").toLowerCase().includes(search.toLowerCase()) ||
+                    (b.city || b.stationId?.city || "").toLowerCase().includes(search.toLowerCase())
             ),
         [bookings, search]
     );
@@ -64,6 +73,9 @@ export default function BookingsPage() {
             default: return "secondary";
         }
     };
+
+    const statusLabel = (status: string) =>
+        status.charAt(0) + status.slice(1).toLowerCase();
 
     const counts = {
         total: bookings.length,
@@ -117,28 +129,40 @@ export default function BookingsPage() {
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-muted/30">
+                                <TableHead>Booking ID</TableHead>
                                 <TableHead>Station</TableHead>
                                 <TableHead>User</TableHead>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Amount</TableHead>
+                                <TableHead>City</TableHead>
+                                <TableHead>Booking Date</TableHead>
+                                <TableHead>Start</TableHead>
+                                <TableHead>End</TableHead>
+                                <TableHead>Duration</TableHead>
+                                <TableHead>Charger Type</TableHead>
+                                <TableHead>Price</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead>Created</TableHead>
                                 <TableHead className="text-right">Action</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filtered.map((b) => (
                                 <TableRow key={b._id}>
-                                    <TableCell className="font-medium">{b.stationId?.name || "—"}</TableCell>
+                                    <TableCell className="font-mono text-xs">{b._id.slice(-8)}</TableCell>
+                                    <TableCell className="font-medium">{b.stationName || b.stationId?.name || "—"}</TableCell>
                                     <TableCell>{b.userId?.name || "—"}</TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">
-                                        {new Date(b.date).toLocaleDateString()} · {b.duration}h
-                                    </TableCell>
-                                    <TableCell className="font-medium">${b.amount}</TableCell>
+                                    <TableCell>{b.city || b.stationId?.city || "—"}</TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">{b.bookingDate || new Date(b.startTime).toLocaleDateString()}</TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">{new Date(b.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">{new Date(b.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</TableCell>
+                                    <TableCell>{b.durationHours}h</TableCell>
+                                    <TableCell>{b.chargerType || "—"}</TableCell>
+                                    <TableCell className="font-medium">LKR {b.amount}</TableCell>
                                     <TableCell>
                                         <Badge variant={statusColor(b.status) as "default" | "success" | "destructive" | "secondary"}>
-                                            {b.status}
+                                            {statusLabel(b.status)}
                                         </Badge>
                                     </TableCell>
+                                    <TableCell className="text-xs text-muted-foreground">{new Date(b.createdAt).toLocaleString()}</TableCell>
                                     <TableCell className="text-right">
                                         {b.status === "CONFIRMED" ? (
                                             <Button

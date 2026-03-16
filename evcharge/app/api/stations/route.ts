@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Station from "@/models/Station";
-import Slot from "@/models/Slot";
 import { getAuthUser } from "@/lib/auth";
+import { getCurrentOccupancyMap } from "@/lib/booking-availability";
+
+function getAvailabilityLabel(availableNow: number, totalChargingPoints: number) {
+    if (availableNow <= 0) return "Fully Booked";
+    if (availableNow <= Math.max(1, Math.ceil(totalChargingPoints * 0.3))) {
+        return "Limited Availability";
+    }
+    return "Available";
+}
 
 export async function GET(request: Request) {
     try {
@@ -46,22 +54,33 @@ export async function GET(request: Request) {
             });
         }
 
-        // Filter by available slots
-        if (availableOnly) {
-            const stationIds = stations.map((s) => s._id);
-            const availableSlots = await Slot.aggregate([
-                { $match: { stationId: { $in: stationIds }, status: "AVAILABLE" } },
-                { $group: { _id: "$stationId", count: { $sum: 1 } } },
-            ]);
-            const availableMap = new Map(
-                availableSlots.map((s) => [s._id.toString(), s.count])
-            );
-            stations = stations.filter(
-                (s) => (availableMap.get(s._id.toString()) || 0) > 0
-            );
-        }
+        const occupancyMap = await getCurrentOccupancyMap(
+            stations.map((s) => String(s._id))
+        );
 
-        return NextResponse.json({ stations });
+        const stationsWithAvailability = stations
+            .map((station) => {
+                const stationObj = station.toObject();
+                const totalChargingPoints =
+                    stationObj.totalChargingPoints || stationObj.totalSlots || 0;
+                const occupiedNow = occupancyMap.get(String(stationObj._id)) || 0;
+                const availableNow = Math.max(totalChargingPoints - occupiedNow, 0);
+
+                return {
+                    ...stationObj,
+                    totalChargingPoints,
+                    totalSlots: totalChargingPoints,
+                    availableNow,
+                    occupiedNow,
+                    availabilityStatus: getAvailabilityLabel(
+                        availableNow,
+                        totalChargingPoints
+                    ),
+                };
+            })
+            .filter((station) => (availableOnly ? station.availableNow > 0 : true));
+
+        return NextResponse.json({ stations: stationsWithAvailability });
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Server error";
         return NextResponse.json({ error: message }, { status: 500 });
@@ -77,9 +96,26 @@ export async function POST(request: Request) {
 
         await dbConnect();
         const body = await request.json();
+        const totalChargingPoints = Number(
+            body.totalChargingPoints ?? body.totalSlots
+        );
+
         const isAdmin = user.role === "ADMIN";
+
         const station = await Station.create({
-            ...body,
+            name: body.name,
+            city: body.city,
+            address: body.address,
+            chargerType: body.chargerType,
+            pricePerKwh: Number(body.pricePerKwh),
+            totalChargingPoints,
+            totalSlots: totalChargingPoints,
+            status: body.status || "AVAILABLE",
+            description: body.description,
+            location: {
+                latitude: Number(body.latitude ?? body.location?.latitude),
+                longitude: Number(body.longitude ?? body.location?.longitude),
+            },
             ownerId: body.ownerId || user.userId,
             isApproved: isAdmin ? true : false,
         });

@@ -18,12 +18,16 @@ interface Vehicle {
 
 interface Booking {
     _id: string;
-    date: string;
-    duration: number;
+    bookingDate?: string;
+    startTime: string;
+    endTime: string;
+    durationHours: number;
     status: string;
     paymentStatus: string;
     amount: number;
-    stationId: { name: string; city: string; pricePerKwh: number };
+    stationName?: string;
+    city?: string;
+    stationId?: { name: string; city: string; pricePerKwh: number } | string | null;
 }
 
 export default function DashboardPage() {

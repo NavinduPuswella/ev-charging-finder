@@ -8,12 +8,16 @@ import { CalendarCheck } from "lucide-react";
 
 interface Booking {
     _id: string;
-    date: string;
-    duration: number;
+    bookingDate?: string;
+    startTime: string;
+    endTime: string;
+    durationHours: number;
     status: string;
     paymentStatus: string;
     amount: number;
-    stationId: { name: string; city: string; pricePerKwh: number };
+    stationName?: string;
+    city?: string;
+    stationId?: { name: string; city: string; pricePerKwh: number } | string | null;
 }
 
 export default function BookingsPage() {
@@ -31,11 +35,17 @@ export default function BookingsPage() {
     }, []);
 
     const handleCancel = async (id: string) => {
-        await fetch(`/api/bookings/${id}`, {
+        const res = await fetch(`/api/bookings/${id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status: "CANCELLED" }),
         });
+        if (!res.ok) {
+            const data = await res.json();
+            alert(data.error || "Unable to cancel booking");
+            return;
+        }
+
         setBookings((prev) =>
             prev.map((b) => (b._id === id ? { ...b, status: "CANCELLED", paymentStatus: "REFUNDED" } : b))
         );
@@ -45,8 +55,12 @@ export default function BookingsPage() {
         return <div className="flex justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
     }
 
-    const filterBookings = (status?: string) =>
-        status ? bookings.filter((b) => b.status === status) : bookings;
+    const now = Date.now();
+    const upcoming = bookings.filter(
+        (b) => b.status === "CONFIRMED" && new Date(b.startTime).getTime() > now
+    );
+    const completed = bookings.filter((b) => b.status === "COMPLETED");
+    const cancelled = bookings.filter((b) => b.status === "CANCELLED");
 
     const renderBookings = (filtered: Booking[]) =>
         filtered.length === 0 ? (
@@ -67,14 +81,14 @@ export default function BookingsPage() {
             <Tabs defaultValue="all">
                 <TabsList>
                     <TabsTrigger value="all">All ({bookings.length})</TabsTrigger>
-                    <TabsTrigger value="confirmed">Active ({filterBookings("CONFIRMED").length})</TabsTrigger>
-                    <TabsTrigger value="completed">Completed ({filterBookings("COMPLETED").length})</TabsTrigger>
-                    <TabsTrigger value="cancelled">Cancelled ({filterBookings("CANCELLED").length})</TabsTrigger>
+                    <TabsTrigger value="upcoming">Upcoming ({upcoming.length})</TabsTrigger>
+                    <TabsTrigger value="completed">Completed ({completed.length})</TabsTrigger>
+                    <TabsTrigger value="cancelled">Cancelled ({cancelled.length})</TabsTrigger>
                 </TabsList>
                 <TabsContent value="all">{renderBookings(bookings)}</TabsContent>
-                <TabsContent value="confirmed">{renderBookings(filterBookings("CONFIRMED"))}</TabsContent>
-                <TabsContent value="completed">{renderBookings(filterBookings("COMPLETED"))}</TabsContent>
-                <TabsContent value="cancelled">{renderBookings(filterBookings("CANCELLED"))}</TabsContent>
+                <TabsContent value="upcoming">{renderBookings(upcoming)}</TabsContent>
+                <TabsContent value="completed">{renderBookings(completed)}</TabsContent>
+                <TabsContent value="cancelled">{renderBookings(cancelled)}</TabsContent>
             </Tabs>
         </div>
     );

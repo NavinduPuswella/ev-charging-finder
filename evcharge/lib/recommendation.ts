@@ -1,15 +1,22 @@
 import { IStation } from "@/models/Station";
-import { ISlot } from "@/models/Slot";
 
 interface RecommendationInput {
     userLat: number;
     userLng: number;
     vehicleRange: number;
-    stations: (IStation & { availableSlots: number; totalSlotCount: number })[];
+    stations: (IStation & {
+        availableSlots: number;
+        totalSlotCount: number;
+        totalChargingPoints?: number;
+    })[];
 }
 
 interface ScoredStation {
-    station: IStation & { availableSlots: number; totalSlotCount: number };
+    station: IStation & {
+        availableSlots: number;
+        totalSlotCount: number;
+        totalChargingPoints?: number;
+    };
     score: number;
     distanceKm: number;
 }

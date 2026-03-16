@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,12 +26,14 @@ interface Station {
     pricePerKwh: number;
     rating: number;
     totalSlots: number;
+    totalChargingPoints?: number;
     location: { latitude: number; longitude: number };
     isApproved: boolean;
     address?: string;
     description?: string;
-    availableSlots?: number;
-    bookedSlots?: number;
+    availableNow?: number;
+    occupiedNow?: number;
+    availabilityStatus?: "Available" | "Limited Availability" | "Fully Booked";
 }
 
 const CHARGER_OPTIONS = ["CCS", "CHAdeMO", "Type1", "Type2", "Tesla"];
@@ -49,31 +51,25 @@ export default function StationsPage() {
     const [showMap, setShowMap] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
 
-    useEffect(() => {
+    const refreshStations = useCallback(() => {
         fetch("/api/stations")
             .then((res) => res.json())
-            .then(async (data) => {
-                const stations: Station[] = data.stations || [];
-                // Fetch slot counts for each station
-                const withSlots = await Promise.all(
-                    stations.map(async (s) => {
-                        try {
-                            const slotRes = await fetch(`/api/stations/${s._id}/slots`);
-                            const slotData = await slotRes.json();
-                            const slots = slotData.slots || [];
-                            const available = slots.filter((sl: { status: string }) => sl.status === "AVAILABLE").length;
-                            const booked = slots.filter((sl: { status: string }) => sl.status === "BOOKED").length;
-                            return { ...s, availableSlots: available, bookedSlots: booked };
-                        } catch {
-                            return { ...s, availableSlots: 0, bookedSlots: 0 };
-                        }
-                    })
-                );
-                setAllStations(withSlots);
-            })
+            .then((data) => setAllStations(data.stations || []))
             .catch(() => {})
             .finally(() => setLoading(false));
     }, []);
+
+    // Fetch on mount
+    useEffect(() => {
+        refreshStations();
+    }, [refreshStations]);
+
+    // Re-fetch when the tab/window regains focus (e.g. user returns from booking)
+    useEffect(() => {
+        const handleFocus = () => refreshStations();
+        window.addEventListener("focus", handleFocus);
+        return () => window.removeEventListener("focus", handleFocus);
+    }, [refreshStations]);
 
     const cities = useMemo(() => {
         const unique = [...new Set(allStations.map((s) => s.city))].sort();
@@ -123,7 +119,7 @@ export default function StationsPage() {
         }
 
         if (onlyAvailable) {
-            list = list.filter((s) => (s.availableSlots || 0) > 0);
+            list = list.filter((s) => (s.availableNow || 0) > 0);
         }
 
         if (ratingFourPlus) {
@@ -142,7 +138,12 @@ export default function StationsPage() {
         pricePerKwh: s.pricePerKwh,
         rating: s.rating,
         reviewCount: 0,
-        slots: { total: s.totalSlots, available: s.availableSlots || 0, booked: s.bookedSlots || 0, nextAvailable: "—" },
+        slots: {
+            total: s.totalChargingPoints || s.totalSlots,
+            available: s.availableNow || 0,
+            booked: s.occupiedNow || 0,
+            nextAvailable: "—",
+        },
         distanceKm: 0,
         location: s.location,
         isOpen: true,
@@ -166,7 +167,7 @@ export default function StationsPage() {
                             <span className="bg-gradient-to-r from-primary to-green-500 bg-clip-text text-transparent">Stations</span>
                         </h1>
                         <p className="text-muted-foreground mt-1 max-w-xl">
-                            Discover, compare and book charging slots at stations across Sri Lanka
+                            Discover, compare and book charging points at stations across Sri Lanka
                         </p>
                     </div>
 
@@ -320,11 +321,13 @@ export default function StationsPage() {
 /* ────────────────── Station Card ──────────────────────── */
 
 function StationCard({ station, index }: { station: Station; index: number }) {
-    const available = station.availableSlots || 0;
-    const booked = station.bookedSlots || 0;
+    const available = station.availableNow || 0;
+    const booked = station.occupiedNow || 0;
     const hasAvailable = available > 0;
-    const total = station.totalSlots || 1;
+    const total = station.totalChargingPoints || station.totalSlots || 1;
     const availPercent = (available / total) * 100;
+    const statusLabel =
+        station.availabilityStatus || (hasAvailable ? "Available" : "Fully Booked");
 
     return (
         <div
@@ -342,8 +345,17 @@ function StationCard({ station, index }: { station: Station; index: number }) {
                             <span className="truncate">{station.city}</span>
                         </div>
                     </div>
-                    <Badge variant={hasAvailable ? "success" : "warning"} className="shrink-0 ml-2">
-                        {hasAvailable ? "Open" : "Full"}
+                    <Badge
+                        variant={
+                            statusLabel === "Available"
+                                ? "success"
+                                : statusLabel === "Limited Availability"
+                                    ? "warning"
+                                    : "destructive"
+                        }
+                        className="shrink-0 ml-2"
+                    >
+                        {statusLabel}
                     </Badge>
                 </div>
 
@@ -361,21 +373,21 @@ function StationCard({ station, index }: { station: Station; index: number }) {
                     </div>
                     <div className="flex flex-col items-center rounded-xl bg-gradient-to-b from-green-50 to-green-50/50 border border-green-100/60 p-2.5">
                         <CircleDollarSign className="h-4 w-4 text-primary mb-0.5" />
-                        <span className="text-sm font-bold">LKR {station.pricePerKwh}</span>
+                        <span className="text-sm font-bold">LKR {station.pricePerKwh} / kWh</span>
                         <span className="text-[10px] text-muted-foreground">per kWh</span>
                     </div>
                     <div className="flex flex-col items-center rounded-xl bg-gradient-to-b from-blue-50 to-blue-50/50 border border-blue-100/60 p-2.5">
                         <Gauge className="h-4 w-4 text-blue-500 mb-0.5" />
-                        <span className="text-sm font-bold">{station.totalSlots}</span>
-                        <span className="text-[10px] text-muted-foreground">total slots</span>
+                        <span className="text-sm font-bold">{total}</span>
+                        <span className="text-[10px] text-muted-foreground">charging points</span>
                     </div>
                 </div>
 
                 <div className="rounded-xl bg-muted/40 border border-border/40 p-3 mb-4">
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-foreground">Slot Availability</span>
-                        <span className={`text-xs font-bold ${hasAvailable ? "text-green-600" : "text-amber-600"}`}>
-                            {available}/{total} available
+                        <span className="text-xs font-semibold text-foreground">Charging Point Availability</span>
+                        <span className={`text-xs font-bold ${hasAvailable ? "text-green-600" : "text-red-600"}`}>
+                            Available Now: {available}
                         </span>
                     </div>
                     <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
@@ -386,7 +398,7 @@ function StationCard({ station, index }: { station: Station; index: number }) {
                     </div>
                     <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-green-400" />{available} available</span>
-                        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-400" />{booked} booked</span>
+                        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-400" />{booked} occupied</span>
                     </div>
                 </div>
 
@@ -396,7 +408,7 @@ function StationCard({ station, index }: { station: Station; index: number }) {
                             <Star className="h-4 w-4" />View Details
                         </Button>
                     </Link>
-                    <Link href={`/stations/${station._id}`} className="flex-1">
+                    <Link href={`/stations/${station._id}?book=true#booking-section`} className="flex-1">
                         <Button className={`w-full rounded-xl h-10 text-sm gap-1.5 ${!hasAvailable ? "opacity-50 cursor-not-allowed" : ""}`} disabled={!hasAvailable}>
                             <CalendarCheck className="h-4 w-4" />Book Slot
                         </Button>

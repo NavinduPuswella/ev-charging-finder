@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Booking from "@/models/Booking";
-import Slot from "@/models/Slot";
 import Station from "@/models/Station";
 import { getAuthUser } from "@/lib/auth";
+import {
+    addHours,
+    buildDateTime,
+    getOverlappingBookingCount,
+    syncStationSlotStatusesForWindow,
+    syncStationStatusFromAvailability,
+} from "@/lib/booking-availability";
 
 export async function GET() {
     try {
@@ -20,7 +26,6 @@ export async function GET() {
             bookings = await Booking.find()
                 .populate("userId", "name email")
                 .populate("stationId", "name city")
-                .populate("slotId")
                 .sort({ createdAt: -1 });
         } else if (user.role === "STATION_OWNER") {
             // Get bookings for owner's stations
@@ -29,12 +34,10 @@ export async function GET() {
             bookings = await Booking.find({ stationId: { $in: stationIds } })
                 .populate("userId", "name email")
                 .populate("stationId", "name city")
-                .populate("slotId")
                 .sort({ createdAt: -1 });
         } else {
             bookings = await Booking.find({ userId: user.userId })
                 .populate("stationId", "name city pricePerKwh")
-                .populate("slotId")
                 .sort({ createdAt: -1 });
         }
 
@@ -54,16 +57,24 @@ export async function POST(request: Request) {
 
         await dbConnect();
         const body = await request.json();
-        const { stationId, slotId, date, duration } = body;
+        const stationId = body.stationId;
+        const bookingDate = String(body.bookingDate || body.date || "");
+        const startTimeRaw = String(body.startTime || "");
+        const durationHours = Number(body.durationHours || body.duration || 1);
 
-        // Verify slot availability
-        const slot = await Slot.findById(slotId);
-        if (!slot || slot.status !== "AVAILABLE") {
+        if (!stationId || !bookingDate || !startTimeRaw || durationHours < 1) {
             return NextResponse.json(
-                { error: "Slot is not available" },
+                { error: "stationId, bookingDate, startTime, and durationHours are required" },
                 { status: 400 }
             );
         }
+
+        const startTime = buildDateTime(bookingDate, startTimeRaw);
+        if (Number.isNaN(startTime.getTime())) {
+            return NextResponse.json({ error: "Invalid date or start time" }, { status: 400 });
+        }
+
+        const endTime = addHours(startTime, durationHours);
 
         // Get station for price calculation
         const station = await Station.findById(stationId);
@@ -71,7 +82,28 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Station not found" }, { status: 404 });
         }
 
-        const amount = station.pricePerKwh * (duration || 1) * 10; // Mock calculation
+        const totalChargingPoints = station.totalChargingPoints || station.totalSlots;
+        const overlappingCount = await getOverlappingBookingCount(
+            stationId,
+            startTime,
+            endTime
+        );
+
+        if (overlappingCount >= totalChargingPoints) {
+            return NextResponse.json(
+                {
+                    error: "Selected time is fully booked. Please choose another time.",
+                    availability: {
+                        totalChargingPoints,
+                        occupied: overlappingCount,
+                        available: 0,
+                    },
+                },
+                { status: 409 }
+            );
+        }
+
+        const amount = Number((station.pricePerKwh * durationHours).toFixed(2));
 
         // Mock Stripe payment
         const paymentStatus = "PAID"; // Mock: always succeeds
@@ -79,16 +111,21 @@ export async function POST(request: Request) {
         const booking = await Booking.create({
             userId: user.userId,
             stationId,
-            slotId,
-            date,
-            duration: duration || 1,
+            stationName: station.name,
+            city: station.city,
+            bookingDate,
+            startTime,
+            endTime,
+            durationHours,
+            chargerType: station.chargerType,
+            pricePerKwh: station.pricePerKwh,
             status: "CONFIRMED",
             paymentStatus,
             amount,
         });
 
-        // Mark slot as booked
-        await Slot.findByIdAndUpdate(slotId, { status: "BOOKED" });
+        await syncStationSlotStatusesForWindow(stationId, startTime, endTime);
+        await syncStationStatusFromAvailability(stationId);
 
         return NextResponse.json(
             {
@@ -96,9 +133,14 @@ export async function POST(request: Request) {
                 message: "Booking confirmed! Payment processed successfully.",
                 paymentDetails: {
                     amount,
-                    currency: "USD",
+                    currency: "LKR",
                     status: "succeeded",
                     method: "Mock Stripe",
+                },
+                availability: {
+                    totalChargingPoints,
+                    occupied: overlappingCount + 1,
+                    available: Math.max(totalChargingPoints - (overlappingCount + 1), 0),
                 },
             },
             { status: 201 }

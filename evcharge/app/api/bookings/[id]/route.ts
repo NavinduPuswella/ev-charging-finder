@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Booking from "@/models/Booking";
-import Slot from "@/models/Slot";
 import { getAuthUser } from "@/lib/auth";
+import {
+    syncStationSlotStatusesForWindow,
+    syncStationStatusFromAvailability,
+} from "@/lib/booking-availability";
 
 export async function PUT(
     request: Request,
@@ -30,12 +33,26 @@ export async function PUT(
         }
 
         if (status === "CANCELLED") {
+            if (
+                user.role !== "ADMIN" &&
+                booking.startTime &&
+                new Date(booking.startTime).getTime() <= Date.now()
+            ) {
+                return NextResponse.json(
+                    { error: "You can only cancel a booking before its start time" },
+                    { status: 400 }
+                );
+            }
+
             booking.status = "CANCELLED";
             booking.paymentStatus = "REFUNDED";
             await booking.save();
-
-            // Release the slot
-            await Slot.findByIdAndUpdate(booking.slotId, { status: "AVAILABLE" });
+            await syncStationSlotStatusesForWindow(
+                String(booking.stationId),
+                new Date(booking.startTime),
+                new Date(booking.endTime)
+            );
+            await syncStationStatusFromAvailability(String(booking.stationId));
 
             return NextResponse.json({
                 booking,
@@ -46,6 +63,12 @@ export async function PUT(
         if (status === "COMPLETED") {
             booking.status = "COMPLETED";
             await booking.save();
+            await syncStationSlotStatusesForWindow(
+                String(booking.stationId),
+                new Date(booking.startTime),
+                new Date(booking.endTime)
+            );
+            await syncStationStatusFromAvailability(String(booking.stationId));
             return NextResponse.json({ booking, message: "Booking marked as completed." });
         }
 

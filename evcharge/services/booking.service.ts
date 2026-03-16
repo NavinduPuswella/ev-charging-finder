@@ -5,9 +5,9 @@ export async function getBookings() {
 
 export async function createBooking(data: {
     stationId: string;
-    slotId: string;
-    date: string;
-    duration: number;
+    bookingDate: string;
+    startTime: string;
+    durationHours: number;
 }) {
     const res = await fetch("/api/bookings", {
         method: "POST",

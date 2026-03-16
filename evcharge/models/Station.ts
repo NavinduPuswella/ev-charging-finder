@@ -11,9 +11,11 @@ export interface IStation extends Document {
     city: string;
     chargerType: "Type1" | "Type2" | "CCS" | "CHAdeMO" | "Tesla";
     totalSlots: number;
+    totalChargingPoints: number;
     pricePerKwh: number;
     rating: number;
     isApproved: boolean;
+    status: "AVAILABLE" | "LIMITED" | "MAINTENANCE" | "INACTIVE";
     address?: string;
     description?: string;
 }
@@ -52,8 +54,12 @@ const StationSchema = new Schema<IStation>(
         },
         totalSlots: {
             type: Number,
-            required: [true, "Total slots is required"],
-            min: [1, "At least 1 slot is required"],
+            min: [1, "At least 1 charging point is required"],
+        },
+        totalChargingPoints: {
+            type: Number,
+            required: [true, "Total charging points is required"],
+            min: [1, "At least 1 charging point is required"],
         },
         pricePerKwh: {
             type: Number,
@@ -70,6 +76,11 @@ const StationSchema = new Schema<IStation>(
             type: Boolean,
             default: false,
         },
+        status: {
+            type: String,
+            enum: ["AVAILABLE", "LIMITED", "MAINTENANCE", "INACTIVE"],
+            default: "AVAILABLE",
+        },
         address: {
             type: String,
             trim: true,
@@ -83,6 +94,16 @@ const StationSchema = new Schema<IStation>(
         timestamps: true,
     }
 );
+
+StationSchema.pre("validate", function () {
+    if (!this.totalChargingPoints && this.totalSlots) {
+        this.totalChargingPoints = this.totalSlots;
+    }
+
+    if (!this.totalSlots && this.totalChargingPoints) {
+        this.totalSlots = this.totalChargingPoints;
+    }
+});
 
 const Station: Model<IStation> =
     mongoose.models.Station || mongoose.model<IStation>("Station", StationSchema);

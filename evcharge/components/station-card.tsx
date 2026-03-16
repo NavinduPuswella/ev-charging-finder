@@ -53,13 +53,13 @@ export default function StationCard({ station, distance }: StationCardProps) {
                     </div>
                     <div className="flex flex-col items-center rounded-lg bg-muted/50 p-2">
                         <DollarSign className="h-4 w-4 text-primary mb-1" />
-                        <span className="text-sm font-semibold">${station.pricePerKwh}</span>
-                        <span className="text-xs text-muted-foreground">per kWh</span>
+                        <span className="text-sm font-semibold">LKR {station.pricePerKwh}</span>
+                        <span className="text-xs text-muted-foreground">Price per kWh</span>
                     </div>
                     <div className="flex flex-col items-center rounded-lg bg-muted/50 p-2">
                         <Zap className="h-4 w-4 text-primary mb-1" />
                         <span className="text-sm font-semibold">{station.totalSlots}</span>
-                        <span className="text-xs text-muted-foreground">Slots</span>
+                        <span className="text-xs text-muted-foreground">Charging Points</span>
                     </div>
                 </div>
             </CardContent>

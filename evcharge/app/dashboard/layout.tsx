@@ -25,7 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (!isLoaded || !isSignedIn) {
         return (
-            <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+            <div className="mt-16 flex items-center justify-center min-h-[calc(100vh-4rem)]">
                 <div className="flex flex-col items-center gap-3">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                     <p className="text-sm text-muted-foreground">Loading...</p>
@@ -35,7 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
 
     return (
-        <div className="flex min-h-[calc(100vh-4rem)]">
+        <div className="mt-16 flex min-h-[calc(100vh-4rem)]">
             <Sidebar role="USER" />
             <div className="flex-1 bg-muted/30">
                 <div className="p-6 lg:p-8">{children}</div>

@@ -4,10 +4,15 @@ export interface IBooking extends Document {
     _id: mongoose.Types.ObjectId;
     userId: mongoose.Types.ObjectId;
     stationId: mongoose.Types.ObjectId;
-    slotId: mongoose.Types.ObjectId;
-    date: Date;
-    duration: number;
-    status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+    stationName: string;
+    city: string;
+    bookingDate: string;
+    startTime: Date;
+    endTime: Date;
+    durationHours: number;
+    chargerType: string;
+    pricePerKwh: number;
+    status: "CONFIRMED" | "CANCELLED" | "COMPLETED";
     paymentStatus: "PENDING" | "PAID" | "REFUNDED";
     amount: number;
 }
@@ -24,24 +29,44 @@ const BookingSchema = new Schema<IBooking>(
             ref: "Station",
             required: true,
         },
-        slotId: {
-            type: Schema.Types.ObjectId,
-            ref: "Slot",
+        stationName: {
+            type: String,
             required: true,
         },
-        date: {
-            type: Date,
+        city: {
+            type: String,
+            required: [true, "City is required"],
+        },
+        bookingDate: {
+            type: String,
             required: [true, "Booking date is required"],
         },
-        duration: {
+        startTime: {
+            type: Date,
+            required: [true, "Start time is required"],
+        },
+        endTime: {
+            type: Date,
+            required: [true, "End time is required"],
+        },
+        durationHours: {
             type: Number,
             required: [true, "Duration is required"],
             min: [1, "Duration must be at least 1 hour"],
         },
+        chargerType: {
+            type: String,
+            required: [true, "Charger type is required"],
+        },
+        pricePerKwh: {
+            type: Number,
+            required: [true, "Price per kWh is required"],
+            min: [0, "Price cannot be negative"],
+        },
         status: {
             type: String,
-            enum: ["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED"],
-            default: "PENDING",
+            enum: ["CONFIRMED", "CANCELLED", "COMPLETED"],
+            default: "CONFIRMED",
         },
         paymentStatus: {
             type: String,
@@ -58,6 +83,8 @@ const BookingSchema = new Schema<IBooking>(
         timestamps: true,
     }
 );
+
+BookingSchema.index({ stationId: 1, startTime: 1, endTime: 1, status: 1 });
 
 const Booking: Model<IBooking> =
     mongoose.models.Booking || mongoose.model<IBooking>("Booking", BookingSchema);

@@ -7,11 +7,14 @@ import { Loader2, CalendarCheck } from "lucide-react";
 
 interface Booking {
     _id: string;
-    date: string;
-    duration: number;
+    startTime: string;
+    endTime: string;
+    durationHours: number;
     status: string;
     amount: number;
-    stationId: { name: string; city: string };
+    stationName?: string;
+    city?: string;
+    stationId?: { name: string; city: string };
     userId: { name: string; email: string };
 }
 
@@ -42,11 +45,13 @@ export default function OwnerBookingsPage() {
                         <Card key={b._id}>
                             <CardContent className="p-4 flex items-center justify-between">
                                 <div>
-                                    <p className="font-medium text-sm">{b.userId?.name || "User"} <span className="text-muted-foreground">·</span> {b.stationId?.name || "Station"}</p>
-                                    <p className="text-xs text-muted-foreground">{new Date(b.date).toLocaleDateString()} · {b.duration}h · {b.userId?.email || ""}</p>
+                                    <p className="font-medium text-sm">{b.userId?.name || "User"} <span className="text-muted-foreground">·</span> {b.stationName || b.stationId?.name || "Station"}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {new Date(b.startTime).toLocaleDateString()} · {b.durationHours}h · {new Date(b.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} - {new Date(b.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {b.userId?.email || ""}
+                                    </p>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <span className="font-semibold text-primary">${b.amount}</span>
+                                    <span className="font-semibold text-primary">LKR {b.amount}</span>
                                     <Badge variant={b.status === "CONFIRMED" ? "default" : b.status === "COMPLETED" ? "success" : "destructive"}>{b.status}</Badge>
                                 </div>
                             </CardContent>

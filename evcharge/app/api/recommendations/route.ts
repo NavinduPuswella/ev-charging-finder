@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Station from "@/models/Station";
-import Slot from "@/models/Slot";
 import { getAuthUser } from "@/lib/auth";
 import { getRecommendedStations } from "@/lib/recommendation";
+import { getCurrentOccupancyMap } from "@/lib/booking-availability";
 
 export async function POST(request: Request) {
     try {
@@ -21,28 +21,28 @@ export async function POST(request: Request) {
         if (chargerType) filter.chargerType = chargerType;
 
         const stations = await Station.find(filter);
-
-        // Get slot availability for each station
-        const stationsWithSlots = await Promise.all(
-            stations.map(async (station) => {
-                const totalSlots = await Slot.countDocuments({ stationId: station._id });
-                const availableSlots = await Slot.countDocuments({
-                    stationId: station._id,
-                    status: "AVAILABLE",
-                });
-                return {
-                    ...station.toObject(),
-                    totalSlotCount: totalSlots,
-                    availableSlots,
-                };
-            })
+        const occupancyMap = await getCurrentOccupancyMap(
+            stations.map((station) => String(station._id))
         );
+
+        const stationsWithAvailability = stations.map((station) => {
+            const stationObj = station.toObject();
+            const totalChargingPoints =
+                stationObj.totalChargingPoints || stationObj.totalSlots || 0;
+            const occupiedNow = occupancyMap.get(String(stationObj._id)) || 0;
+            return {
+                ...stationObj,
+                totalSlotCount: totalChargingPoints,
+                totalChargingPoints,
+                availableSlots: Math.max(totalChargingPoints - occupiedNow, 0),
+            };
+        });
 
         const recommendations = getRecommendedStations({
             userLat: latitude,
             userLng: longitude,
             vehicleRange: vehicleRange || 200,
-            stations: stationsWithSlots as unknown as Parameters<typeof getRecommendedStations>[0]["stations"],
+            stations: stationsWithAvailability as unknown as Parameters<typeof getRecommendedStations>[0]["stations"],
         });
 
         return NextResponse.json({

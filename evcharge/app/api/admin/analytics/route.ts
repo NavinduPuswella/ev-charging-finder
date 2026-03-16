@@ -18,12 +18,13 @@ export async function GET() {
         const totalStations = await Station.countDocuments({ isApproved: true });
         const pendingStations = await Station.countDocuments({ isApproved: false });
         const totalBookings = await Booking.countDocuments();
+        const confirmedBookings = await Booking.countDocuments({ status: "CONFIRMED" });
         const completedBookings = await Booking.countDocuments({ status: "COMPLETED" });
         const cancelledBookings = await Booking.countDocuments({ status: "CANCELLED" });
 
         // Revenue
         const revenueResult = await Booking.aggregate([
-            { $match: { paymentStatus: "PAID" } },
+            { $match: { status: { $in: ["CONFIRMED", "COMPLETED"] } } },
             { $group: { _id: null, total: { $sum: "$amount" } } },
         ]);
         const totalRevenue = revenueResult[0]?.total || 0;
@@ -74,6 +75,7 @@ export async function GET() {
                 totalStations,
                 pendingStations,
                 totalBookings,
+                confirmedBookings,
                 completedBookings,
                 cancelledBookings,
                 totalRevenue,

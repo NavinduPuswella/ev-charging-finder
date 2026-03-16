@@ -27,8 +27,10 @@ interface StationResult {
         pricePerKwh: number;
         rating: number;
         totalSlots: number;
+        totalChargingPoints?: number;
         location: { latitude: number; longitude: number };
         availableSlots: number;
+        availabilityStatus?: "Available" | "Limited Availability" | "Fully Booked";
     };
     score: number;
     distanceKm: number;
@@ -222,6 +224,8 @@ export default function TripPlannerPage() {
 function RecommendationCard({ result, index }: { result: StationResult; index: number }) {
     const { station, score, distanceKm } = result;
     const hasAvailable = station.availableSlots > 0;
+    const totalChargingPoints = station.totalChargingPoints || station.totalSlots;
+    const statusLabel = station.availabilityStatus || (hasAvailable ? "Available" : "Fully Booked");
 
     return (
         <div
@@ -249,8 +253,11 @@ function RecommendationCard({ result, index }: { result: StationResult; index: n
                             <span className="text-primary font-medium ml-1 whitespace-nowrap">{distanceKm} km away</span>
                         </div>
                     </div>
-                    <Badge variant={hasAvailable ? "success" : "warning"} className="ml-2 shrink-0">
-                        {hasAvailable ? "Available" : "Full"}
+                    <Badge
+                        variant={statusLabel === "Available" ? "success" : statusLabel === "Limited Availability" ? "warning" : "destructive"}
+                        className="ml-2 shrink-0"
+                    >
+                        {statusLabel}
                     </Badge>
                 </div>
 
@@ -265,8 +272,8 @@ function RecommendationCard({ result, index }: { result: StationResult; index: n
                 <div className="grid grid-cols-3 gap-2 mb-4">
                     <div className="rounded-xl bg-gradient-to-br from-muted/30 to-muted/50 p-2.5 text-center">
                         <div className="text-xs text-muted-foreground">Price</div>
-                        <div className="font-bold text-sm text-foreground">LKR {station.pricePerKwh}</div>
-                        <div className="text-[10px] text-muted-foreground">per kWh</div>
+                        <div className="font-bold text-sm text-foreground">LKR {station.pricePerKwh} / kWh</div>
+                        <div className="text-[10px] text-muted-foreground">Price per kWh</div>
                     </div>
                     <div className="rounded-xl bg-gradient-to-br from-muted/30 to-muted/50 p-2.5 text-center">
                         <div className="text-xs text-muted-foreground">Rating</div>
@@ -275,9 +282,9 @@ function RecommendationCard({ result, index }: { result: StationResult; index: n
                         </div>
                     </div>
                     <div className="rounded-xl bg-gradient-to-br from-muted/30 to-muted/50 p-2.5 text-center">
-                        <div className="text-xs text-muted-foreground">Slots</div>
-                        <div className="font-bold text-sm text-foreground">{station.availableSlots}/{station.totalSlots}</div>
-                        <div className="text-[10px] text-muted-foreground">available</div>
+                        <div className="text-xs text-muted-foreground">Available Now</div>
+                        <div className="font-bold text-sm text-foreground">{station.availableSlots}/{totalChargingPoints}</div>
+                        <div className="text-[10px] text-muted-foreground">charging points</div>
                     </div>
                 </div>
 
@@ -288,7 +295,7 @@ function RecommendationCard({ result, index }: { result: StationResult; index: n
                             <Search className="h-3 w-3" /> View Details
                         </Button>
                     </Link>
-                    <Link href={`/stations/${station._id}`} className="flex-1">
+                    <Link href={`/stations/${station._id}?book=true#booking-section`} className="flex-1">
                         <Button size="sm" className="w-full rounded-lg text-xs gap-1.5 h-9" disabled={!hasAvailable}>
                             <CalendarCheck className="h-3 w-3" /> {hasAvailable ? "Book Slot" : "Unavailable"}
                         </Button>
