@@ -110,6 +110,11 @@ html {
   to { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
 @keyframes pulse-green {
   0%, 100% { box-shadow: 0 0 0 0 hsla(var(--primary), 0.4); }
   50% { box-shadow: 0 0 0 8px hsla(var(--primary), 0); }
@@ -125,4 +130,8 @@ html {
 
 .animate-pulse-green {
   animation: pulse-green 2s infinite;
+}
+
+.animate-marquee {
+  animation: marquee 20s linear infinite;
 }

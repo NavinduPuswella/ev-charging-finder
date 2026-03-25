@@ -10,7 +10,10 @@ import {
   ArrowRight,
   Battery,
   Clock,
-  Users,
+  Radar,
+  ShieldCheck,
+  Leaf,
+  Gauge,
 } from "lucide-react";
 
 export default function Home() {
@@ -110,57 +113,117 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-20 bg-gradient-to-b from-green-50/50 to-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-foreground sm:text-4xl">
-              How It <span className="text-primary">Works</span>
-            </h2>
-          </div>
-          <div className="grid gap-8 md:grid-cols-4">
-            {[
-              { step: "01", icon: Users, title: "Sign Up", desc: "Create your free account in seconds" },
-              { step: "02", icon: MapPin, title: "Find Station", desc: "Search and filter charging stations" },
-              { step: "03", icon: CalendarCheck, title: "Book Slot", desc: "Select time and confirm booking" },
-              { step: "04", icon: Zap, title: "Charge Up", desc: "Arrive and charge your EV" },
-            ].map(({ step, icon: Icon, title, desc }) => (
-              <div key={step} className="text-center group">
-                <div className="relative mx-auto mb-4">
-                  <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 group-hover:scale-110 transition-transform">
-                    <Icon className="h-7 w-7" />
+      {/* Charging Experience Section */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-green-50/60 via-white to-white py-24">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-20 top-10 h-72 w-72 rounded-full bg-green-300/30 blur-3xl" />
+          <div className="absolute right-0 top-0 h-80 w-80 rounded-full bg-green-200/30 blur-3xl" />
+        </div>
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <Card className="border-green-100 bg-white/90 shadow-xl backdrop-blur">
+            <CardContent className="p-6 sm:p-10 lg:p-12">
+              <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
+                <div className="min-w-0">
+                  
+                  <h2 className="mt-5 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
+                    From route to recharge,
+                    <span className="block text-green-700">everything feels effortless.</span>
+                  </h2>
+                  <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
+                    EVCharge removes charging friction with cleaner decisions, faster bookings, and dependable station choices.
+                  </p>
+                  <div className="mt-8">
+                    <div className="rounded-xl border border-green-100 bg-white px-3 py-3">
+                      <div className="w-full overflow-hidden">
+                        <div className="animate-marquee flex min-w-max items-center gap-3">
+                          {[
+                            "Tesla Model 3",
+                            "Nissan Leaf",
+                            "Hyundai Ioniq 5",
+                            "BYD Atto 3",
+                            "Kia EV6",
+                            "MG ZS EV",
+                            "BMW i4",
+                          ]
+                            .concat([
+                              "Tesla Model 3",
+                              "Nissan Leaf",
+                              "Hyundai Ioniq 5",
+                              "BYD Atto 3",
+                              "Kia EV6",
+                              "MG ZS EV",
+                              "BMW i4",
+                            ])
+                            .map((vehicle, index) => (
+                              <span
+                                key={`${vehicle}-${index}`}
+                                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-green-200 bg-white px-3 py-1 text-xs font-medium text-slate-700"
+                              >
+                                <Battery className="h-3.5 w-3.5 text-green-700" />
+                                {vehicle}
+                              </span>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <span className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-background text-xs font-bold">
-                    {step}
-                  </span>
                 </div>
-                <h3 className="font-semibold text-lg mb-1">{title}</h3>
-                <p className="text-sm text-muted-foreground">{desc}</p>
+
               </div>
-            ))}
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
+      {/* Premium CTA Section */}
+      <section className="py-24 bg-white">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <Card className="relative overflow-hidden rounded-[2rem] border-green-200 bg-gradient-to-r from-white via-green-50 to-white shadow-2xl">
+            <div className="absolute -left-16 -top-16 h-56 w-56 rounded-full bg-green-300/25 blur-3xl" />
+            <div className="absolute -right-20 -bottom-20 h-72 w-72 rounded-full bg-green-200/30 blur-3xl" />
+            <CardContent className="relative p-8 sm:p-10 lg:p-14">
+              <div className="grid gap-10 lg:grid-cols-[1.2fr_1fr] lg:items-end">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-green-700">
+                    Start your better charging routine
+                  </p>
+                  <h2 className="mt-4 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
+                    Charge smarter,
+                    <span className="block text-green-700">not harder.</span>
+                  </h2>
+                  <p className="mt-4 max-w-2xl text-base text-slate-600 sm:text-lg">
+                    Set up your account once and manage every station search, booking, and charging stop with a cleaner workflow.
+                  </p>
+                  <div className="mt-7 flex flex-wrap gap-4 text-sm text-slate-600">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-white/80 px-3 py-1">
+                      <Zap className="h-3.5 w-3.5 text-green-700" /> Faster bookings
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-white/80 px-3 py-1">
+                      <ShieldCheck className="h-3.5 w-3.5 text-green-700" /> Transparent station quality
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-white/80 px-3 py-1">
+                      <Leaf className="h-3.5 w-3.5 text-green-700" /> Trip-ready charging plans
+                    </span>
+                  </div>
+                </div>
 
-
-      {/* CTA Section */}
-      <section className="py-20 bg-primary">
-        <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-primary-foreground sm:text-4xl">
-            Ready to Charge Smarter?
-          </h2>
-          <p className="mt-4 text-lg text-primary-foreground/80">
-            Join thousands of EV owners who trust EVCharge for reliable charging.
-          </p>
-          <div className="mt-8 flex flex-col gap-4 sm:flex-row justify-center">
-            <Link href="/sign-up">
-              <Button size="lg" variant="secondary" className="gap-2 shadow-lg">
-                Sign Up
-                <ArrowRight className="h-5 w-5" />
-              </Button>
-            </Link>
-          </div>
+                <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+                  <Link href="/sign-up" className="w-full">
+                    <Button size="lg" className="w-full gap-2 bg-green-600 text-white hover:bg-green-700">
+                      Create Free Account
+                      <ArrowRight className="h-5 w-5" />
+                    </Button>
+                  </Link>
+                  <Link href="/stations" className="w-full">
+                    <Button size="lg" variant="outline" className="w-full gap-2 border-green-300 text-green-700 hover:bg-green-50">
+                      Browse Stations
+                      <MapPin className="h-5 w-5" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
@@ -186,6 +249,7 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
     </div>
   );
 }
