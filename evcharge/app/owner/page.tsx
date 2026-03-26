@@ -107,7 +107,7 @@ export default function OwnerDashboard() {
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2"><Label>Total Slots</Label><Input type="number" value={form.totalSlots} onChange={(e) => setForm({ ...form, totalSlots: e.target.value })} required /></div>
-                                <div className="space-y-2"><Label>Price/kWh ($)</Label><Input type="number" step="0.01" value={form.pricePerKwh} onChange={(e) => setForm({ ...form, pricePerKwh: e.target.value })} required /></div>
+                                <div className="space-y-2"><Label>Price/kWh</Label><Input type="number" step="0.01" value={form.pricePerKwh} onChange={(e) => setForm({ ...form, pricePerKwh: e.target.value })} required /></div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2"><Label>Latitude</Label><Input type="number" step="any" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} required /></div>
@@ -119,15 +119,13 @@ export default function OwnerDashboard() {
                 </Dialog>
             </div>
 
-            {/* Stats */}
             <div className="grid gap-4 md:grid-cols-4">
-                <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Stations</p><p className="text-3xl font-bold">{stations.length}</p></div><Building2 className="h-8 w-8 text-primary" /></div></CardContent></Card>
-                <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Bookings</p><p className="text-3xl font-bold">{bookings.length}</p></div><CalendarCheck className="h-8 w-8 text-blue-500" /></div></CardContent></Card>
-                <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Revenue</p><p className="text-3xl font-bold">${totalRevenue}</p></div><DollarSign className="h-8 w-8 text-green-500" /></div></CardContent></Card>
-                <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Approved</p><p className="text-3xl font-bold">{stations.filter((s) => s.isApproved).length}</p></div><Zap className="h-8 w-8 text-yellow-500" /></div></CardContent></Card>
+                <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Stations</p><p className="text-3xl font-bold">{stations.length}</p></div><div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center"><Building2 className="h-5 w-5 text-primary" /></div></div></CardContent></Card>
+                <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Bookings</p><p className="text-3xl font-bold">{bookings.length}</p></div><div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center"><CalendarCheck className="h-5 w-5 text-blue-500" /></div></div></CardContent></Card>
+                <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Revenue</p><p className="text-3xl font-bold">LKR {totalRevenue}</p></div><div className="h-10 w-10 rounded-lg bg-green-50 flex items-center justify-center"><DollarSign className="h-5 w-5 text-green-500" /></div></div></CardContent></Card>
+                <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Approved</p><p className="text-3xl font-bold">{stations.filter((s) => s.isApproved).length}</p></div><div className="h-10 w-10 rounded-lg bg-yellow-50 flex items-center justify-center"><Zap className="h-5 w-5 text-yellow-500" /></div></div></CardContent></Card>
             </div>
 
-            {/* Stations */}
             <div>
                 <h2 className="text-xl font-semibold mb-4">My Stations</h2>
                 {stations.length === 0 ? (
@@ -135,8 +133,8 @@ export default function OwnerDashboard() {
                 ) : (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {stations.map((s) => (
-                            <Card key={s._id} className="hover:shadow-lg transition-all">
-                                <div className={`h-1.5 ${s.isApproved ? "bg-gradient-to-r from-green-400 to-green-600" : "bg-gradient-to-r from-yellow-400 to-orange-400"}`} />
+                            <Card key={s._id}>
+                                <div className={`h-1 ${s.isApproved ? "bg-primary" : "bg-yellow-400"}`} />
                                 <CardHeader className="pb-3">
                                     <div className="flex items-start justify-between">
                                         <CardTitle className="text-base">{s.name}</CardTitle>
@@ -147,7 +145,7 @@ export default function OwnerDashboard() {
                                 <CardContent>
                                     <div className="grid grid-cols-3 gap-2 text-sm">
                                         <div className="text-center p-2 bg-muted/50 rounded-lg"><div className="font-semibold">{s.totalSlots}</div><div className="text-xs text-muted-foreground">Slots</div></div>
-                                        <div className="text-center p-2 bg-muted/50 rounded-lg"><div className="font-semibold">${s.pricePerKwh}</div><div className="text-xs text-muted-foreground">kWh</div></div>
+                                        <div className="text-center p-2 bg-muted/50 rounded-lg"><div className="font-semibold">LKR {s.pricePerKwh}</div><div className="text-xs text-muted-foreground">kWh</div></div>
                                         <div className="text-center p-2 bg-muted/50 rounded-lg"><div className="font-semibold flex items-center justify-center gap-1"><Star className="h-3 w-3 text-yellow-500" />{s.rating.toFixed(1)}</div><div className="text-xs text-muted-foreground">Rating</div></div>
                                     </div>
                                 </CardContent>
@@ -157,7 +155,6 @@ export default function OwnerDashboard() {
                 )}
             </div>
 
-            {/* Recent Bookings */}
             <div>
                 <h2 className="text-xl font-semibold mb-4">Recent Bookings</h2>
                 {bookings.length === 0 ? (
@@ -172,7 +169,7 @@ export default function OwnerDashboard() {
                                         <p className="text-xs text-muted-foreground">{new Date(b.date).toLocaleDateString()} · {b.duration}h</p>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <span className="font-semibold text-primary">${b.amount}</span>
+                                        <span className="font-semibold text-primary">LKR {b.amount}</span>
                                         <Badge variant={b.status === "CONFIRMED" ? "default" : b.status === "COMPLETED" ? "success" : "destructive"}>{b.status}</Badge>
                                     </div>
                                 </CardContent>

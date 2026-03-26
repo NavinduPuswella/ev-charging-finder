@@ -22,13 +22,11 @@ export async function GET() {
 
         let bookings;
         if (user.role === "ADMIN") {
-            // Admin sees all bookings
             bookings = await Booking.find()
                 .populate("userId", "name email")
                 .populate("stationId", "name city")
                 .sort({ createdAt: -1 });
         } else if (user.role === "STATION_OWNER") {
-            // Get bookings for owner's stations
             const stations = await Station.find({ ownerId: user.userId });
             const stationIds = stations.map((s) => s._id);
             bookings = await Booking.find({ stationId: { $in: stationIds } })
@@ -76,7 +74,6 @@ export async function POST(request: Request) {
 
         const endTime = addHours(startTime, durationHours);
 
-        // Get station for price calculation
         const station = await Station.findById(stationId);
         if (!station) {
             return NextResponse.json({ error: "Station not found" }, { status: 404 });
@@ -105,9 +102,6 @@ export async function POST(request: Request) {
 
         const amount = Number((station.pricePerKwh * durationHours).toFixed(2));
 
-        // Mock Stripe payment
-        const paymentStatus = "PAID"; // Mock: always succeeds
-
         const booking = await Booking.create({
             userId: user.userId,
             stationId,
@@ -119,23 +113,20 @@ export async function POST(request: Request) {
             durationHours,
             chargerType: station.chargerType,
             pricePerKwh: station.pricePerKwh,
-            status: "CONFIRMED",
-            paymentStatus,
+            status: "PENDING_PAYMENT",
+            paymentStatus: "PENDING",
             amount,
         });
-
-        await syncStationSlotStatusesForWindow(stationId, startTime, endTime);
-        await syncStationStatusFromAvailability(stationId);
 
         return NextResponse.json(
             {
                 booking,
-                message: "Booking confirmed! Payment processed successfully.",
+                message: "Booking created. Please complete payment.",
                 paymentDetails: {
                     amount,
                     currency: "LKR",
-                    status: "succeeded",
-                    method: "Mock Stripe",
+                    status: "pending",
+                    bookingId: booking._id.toString(),
                 },
                 availability: {
                     totalChargingPoints,

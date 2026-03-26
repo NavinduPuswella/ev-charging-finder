@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import Script from "next/script";
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
 import Navbar from "@/components/navbar";
 
 const inter = Inter({
@@ -27,6 +29,10 @@ export default function RootLayout({
         <body className={`${inter.variable} antialiased`}>
           <Navbar />
           <main>{children}</main>
+          <Script
+            src="https://www.payhere.lk/lib/payhere.js"
+            strategy="beforeInteractive"
+          />
         </body>
       </html>
     </ClerkProvider>

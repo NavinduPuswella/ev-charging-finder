@@ -2,38 +2,68 @@
 
 :root {
   --background: 0 0% 100%;
-  --foreground: 150 10% 10%;
+  --foreground: 220 14% 10%;
   --card: 0 0% 100%;
-  --card-foreground: 150 10% 10%;
+  --card-foreground: 220 14% 10%;
   --popover: 0 0% 100%;
-  --popover-foreground: 150 10% 10%;
+  --popover-foreground: 220 14% 10%;
   --primary: 142 71% 35%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 140 40% 96%;
-  --secondary-foreground: 150 10% 10%;
-  --muted: 140 20% 96%;
-  --muted-foreground: 150 5% 45%;
-  --accent: 140 40% 94%;
-  --accent-foreground: 150 10% 10%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 220 14% 10%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 46%;
+  --accent: 220 14% 94%;
+  --accent-foreground: 220 14% 10%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --border: 140 15% 90%;
-  --input: 140 15% 90%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
   --ring: 142 71% 35%;
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --chart-1: 142 71% 35%;
   --chart-2: 160 60% 45%;
   --chart-3: 120 40% 50%;
   --chart-4: 80 50% 55%;
   --chart-5: 200 50% 50%;
-  --sidebar-background: 140 30% 98%;
-  --sidebar-foreground: 150 10% 10%;
+  --sidebar-background: 0 0% 99%;
+  --sidebar-foreground: 220 14% 10%;
   --sidebar-primary: 142 71% 35%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 140 40% 94%;
-  --sidebar-accent-foreground: 150 10% 10%;
-  --sidebar-border: 140 15% 92%;
+  --sidebar-accent: 220 14% 96%;
+  --sidebar-accent-foreground: 220 14% 10%;
+  --sidebar-border: 220 13% 93%;
   --sidebar-ring: 142 71% 35%;
+}
+
+.dark {
+  --background: 222 47% 8%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 142 71% 45%;
+  --primary-foreground: 220 14% 10%;
+  --secondary: 217 32% 17%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 217 32% 17%;
+  --muted-foreground: 215 20% 70%;
+  --accent: 217 32% 17%;
+  --accent-foreground: 210 40% 96%;
+  --destructive: 0 63% 40%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 217 32% 22%;
+  --input: 217 32% 22%;
+  --ring: 142 71% 45%;
+  --sidebar-background: 222 47% 10%;
+  --sidebar-foreground: 210 40% 96%;
+  --sidebar-primary: 142 71% 45%;
+  --sidebar-primary-foreground: 220 14% 10%;
+  --sidebar-accent: 217 32% 17%;
+  --sidebar-accent-foreground: 210 40% 96%;
+  --sidebar-border: 217 32% 22%;
+  --sidebar-ring: 142 71% 45%;
 }
 
 @theme inline {
@@ -82,12 +112,10 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-/* Smooth scrolling */
 html {
   scroll-behavior: smooth;
 }
 
-/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -95,43 +123,33 @@ html {
   background: hsl(var(--muted));
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--primary));
+  background: hsl(var(--border));
   border-radius: 3px;
 }
 
-/* Animation keyframes */
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slide-in-right {
-  from { opacity: 0; transform: translateX(20px); }
+  from { opacity: 0; transform: translateX(16px); }
   to { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes marquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-
-@keyframes pulse-green {
-  0%, 100% { box-shadow: 0 0 0 0 hsla(var(--primary), 0.4); }
-  50% { box-shadow: 0 0 0 8px hsla(var(--primary), 0); }
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .animate-fade-in {
-  animation: fade-in 0.5s ease-out forwards;
+  animation: fade-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .animate-slide-in-right {
-  animation: slide-in-right 0.4s ease-out forwards;
+  animation: slide-in-right 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.animate-pulse-green {
-  animation: pulse-green 2s infinite;
-}
-
-.animate-marquee {
-  animation: marquee 20s linear infinite;
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

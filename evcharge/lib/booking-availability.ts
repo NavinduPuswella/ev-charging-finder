@@ -3,7 +3,7 @@ import Slot from "@/models/Slot";
 import Station from "@/models/Station";
 import mongoose from "mongoose";
 
-const ACTIVE_BOOKING_STATUS = ["CONFIRMED"] as const;
+const ACTIVE_BOOKING_STATUS = ["CONFIRMED", "PENDING_PAYMENT"] as const;
 
 export function buildDateTime(bookingDate: string, startTime: string) {
     return new Date(`${bookingDate}T${startTime}:00`);
@@ -114,7 +114,6 @@ export async function syncStationStatusFromAvailability(stationId: string) {
         return;
     }
 
-    // Keep owner/admin maintenance toggles intact.
     if (station.status === "MAINTENANCE") {
         return;
     }

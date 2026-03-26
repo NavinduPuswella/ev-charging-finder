@@ -44,7 +44,7 @@ export default function BookingCard({ booking, onCancel }: BookingCardProps) {
         booking.status.charAt(0) + booking.status.slice(1).toLowerCase();
 
     return (
-        <Card className="transition-all hover:shadow-md">
+        <Card>
             <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                     <CardTitle className="text-base">{stationName}</CardTitle>

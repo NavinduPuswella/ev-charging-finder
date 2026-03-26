@@ -12,7 +12,7 @@ export interface IBooking extends Document {
     durationHours: number;
     chargerType: string;
     pricePerKwh: number;
-    status: "CONFIRMED" | "CANCELLED" | "COMPLETED";
+    status: "PENDING_PAYMENT" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
     paymentStatus: "PENDING" | "PAID" | "REFUNDED";
     amount: number;
 }
@@ -65,8 +65,8 @@ const BookingSchema = new Schema<IBooking>(
         },
         status: {
             type: String,
-            enum: ["CONFIRMED", "CANCELLED", "COMPLETED"],
-            default: "CONFIRMED",
+            enum: ["PENDING_PAYMENT", "CONFIRMED", "CANCELLED", "COMPLETED"],
+            default: "PENDING_PAYMENT",
         },
         paymentStatus: {
             type: String,

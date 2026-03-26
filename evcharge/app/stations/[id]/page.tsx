@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MapView from "@/components/map-view";
 import {
     MapPin,
@@ -21,7 +22,7 @@ import {
     Phone,
     Timer,
 } from "lucide-react";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 
 interface Station {
     _id: string;
@@ -60,6 +61,13 @@ interface AvailabilityResult {
     };
 }
 
+interface SlotData {
+    _id: string;
+    startTime: string;
+    endTime: string;
+    status: "AVAILABLE" | "BOOKED";
+}
+
 function getTodayDateString() {
     const now = new Date();
     return now.toISOString().split("T")[0];
@@ -76,6 +84,23 @@ function formatLkr(value: number) {
     return `LKR ${value} / kWh`;
 }
 
+function toLocalDateInputValue(value: string) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function toLocalTimeInputValue(value: string) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+}
+
 function getAvailabilityBadge(status: Station["availabilityStatus"]) {
     if (status === "Available") return "success" as const;
     if (status === "Limited Availability") return "warning" as const;
@@ -87,6 +112,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
     const router = useRouter();
     const searchParams = useSearchParams();
     const { isSignedIn } = useAuth();
+    const { user: clerkUser } = useUser();
 
     const bookingSectionRef = useRef<HTMLDivElement | null>(null);
 
@@ -99,14 +125,24 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
     const [submittingBooking, setSubmittingBooking] = useState(false);
     const [checkingAvailability, setCheckingAvailability] = useState(false);
     const [bookingAvailability, setBookingAvailability] = useState<AvailabilityResult | null>(null);
+    const [slots, setSlots] = useState<SlotData[]>([]);
+    const [selectedSlotId, setSelectedSlotId] = useState("manual");
     const [reviewComment, setReviewComment] = useState("");
-    const [reviewRating, setReviewRating] = useState("5");
+    const [reviewRating, setReviewRating] = useState(5);
+    const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
 
     const refreshStation = async () => {
-        const res = await fetch(`/api/stations/${id}`);
-        const data = await res.json();
-        setStation(data.station);
-        setReviews(data.reviews || []);
+        const [stationRes, slotsRes] = await Promise.all([
+            fetch(`/api/stations/${id}`),
+            fetch(`/api/stations/${id}/slots`),
+        ]);
+
+        const stationData = await stationRes.json();
+        const slotsData = await slotsRes.json();
+
+        setStation(stationData.station);
+        setReviews(stationData.reviews || []);
+        setSlots(slotsData.slots || []);
         setLoading(false);
     };
 
@@ -155,6 +191,23 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
         run();
     }, [id, bookingDate, startTime, durationHours, station]);
 
+    useEffect(() => {
+        if (selectedSlotId === "manual") return;
+        const slot = slots.find((item) => item._id === selectedSlotId);
+        if (!slot) return;
+
+        const start = new Date(slot.startTime);
+        const end = new Date(slot.endTime);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+
+        const durationMs = end.getTime() - start.getTime();
+        const duration = Math.max(1, Math.round(durationMs / (1000 * 60 * 60)));
+
+        setBookingDate(toLocalDateInputValue(slot.startTime));
+        setStartTime(toLocalTimeInputValue(slot.startTime));
+        setDurationHours(String(duration));
+    }, [selectedSlotId, slots]);
+
     const bookingSummary = useMemo(() => {
         if (!bookingDate || !startTime) return null;
 
@@ -180,8 +233,10 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
         if (!bookingSummary || !station) return;
 
         setSubmittingBooking(true);
+        setPaymentStatus(null);
+
         try {
-            const res = await fetch("/api/bookings", {
+            const bookingRes = await fetch("/api/bookings", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -192,15 +247,94 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                 }),
             });
 
-            const data = await res.json();
-            if (!res.ok) {
-                alert(data.error || "Booking failed");
+            const bookingData = await bookingRes.json();
+            if (!bookingRes.ok) {
+                alert(bookingData.error || "Booking failed");
+                setSubmittingBooking(false);
                 return;
             }
 
-            alert(data.message || "Booking confirmed");
-            await refreshStation();
-        } finally {
+            const bookingId = bookingData.paymentDetails.bookingId;
+            const amount = bookingData.paymentDetails.amount;
+            const currency = "LKR";
+            const merchantId = process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID || "";
+
+            const hashRes = await fetch("/api/payhere/hash", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    order_id: bookingId,
+                    amount: amount.toFixed(2),
+                    currency,
+                }),
+            });
+
+            const hashData = await hashRes.json();
+            if (!hashRes.ok) {
+                alert("Failed to initialize payment");
+                setSubmittingBooking(false);
+                return;
+            }
+
+            const payhereGlobal = (window as unknown as { payhere: typeof payhere }).payhere;
+
+            payhereGlobal.onCompleted = async function onCompleted() {
+                const confirmRes = await fetch(`/api/bookings/${bookingId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "CONFIRMED" }),
+                });
+
+                if (!confirmRes.ok) {
+                    setPaymentStatus("error");
+                    setSubmittingBooking(false);
+                    alert("Payment completed, but booking confirmation failed. Please contact support.");
+                    return;
+                }
+
+                setPaymentStatus("success");
+                setSubmittingBooking(false);
+                refreshStation();
+            };
+
+            payhereGlobal.onDismissed = function onDismissed() {
+                setPaymentStatus("dismissed");
+                setSubmittingBooking(false);
+                fetch(`/api/bookings/${bookingId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "CANCELLED" }),
+                });
+            };
+
+            payhereGlobal.onError = function onError() {
+                setPaymentStatus("error");
+                setSubmittingBooking(false);
+            };
+
+            const payment = {
+                sandbox: true,
+                merchant_id: merchantId,
+                return_url: `${window.location.origin}/dashboard/bookings`,
+                cancel_url: window.location.href,
+                notify_url: `${window.location.origin}/api/payhere/notify`,
+                order_id: bookingId,
+                items: `EV Charging - ${station.name}`,
+                amount: amount.toFixed(2),
+                currency: currency,
+                hash: hashData.hash,
+                first_name: clerkUser?.firstName || "Customer",
+                last_name: clerkUser?.lastName || "",
+                email: clerkUser?.emailAddresses?.[0]?.emailAddress || "customer@example.com",
+                phone: "0771234567",
+                address: station.address || station.city,
+                city: station.city || "Colombo",
+                country: "Sri Lanka",
+            };
+
+            payhereGlobal.startPayment(payment);
+        } catch {
+            alert("Something went wrong. Please try again.");
             setSubmittingBooking(false);
         }
     };
@@ -210,7 +344,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
         const res = await fetch(`/api/stations/${id}/reviews`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ rating: Number(reviewRating), comment: reviewComment }),
+            body: JSON.stringify({ rating: reviewRating, comment: reviewComment }),
         });
 
         const data = await res.json();
@@ -224,25 +358,32 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
 
     if (loading) {
         return (
-            <div className="flex justify-center py-20">
+            <div className="flex justify-center py-20 mt-16">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
 
     if (!station) {
-        return <div className="flex justify-center py-20 text-muted-foreground">Station not found</div>;
+        return <div className="flex justify-center py-20 mt-16 text-muted-foreground">Station not found</div>;
     }
 
     const totalChargingPoints = station.totalChargingPoints || station.totalSlots;
     const availableNow = station.availableNow ?? 0;
     const occupiedNow = station.occupiedNow ?? 0;
+    const availableSlots = slots
+        .filter((slot) => slot.status === "AVAILABLE")
+        .filter((slot) => new Date(slot.endTime).getTime() > Date.now())
+        .sort(
+            (a, b) =>
+                new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        );
 
     return (
-        <div className="min-h-[calc(100vh-4rem)]">
-            <div className="bg-gradient-to-r from-green-50 to-white border-b border-border">
-                <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-background via-background to-muted/20">
+            <div className="border-b border-border bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.12),_transparent_52%)]">
+                <div className="mx-auto max-w-7xl px-4 py-8 pt-24 sm:px-6 lg:px-8">
+                    <div className="flex flex-col gap-6 rounded-2xl border border-border/60 bg-background/85 p-6 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
                         <div>
                             <h1 className="text-3xl font-bold">{station.name}</h1>
                             <div className="flex items-center gap-3 mt-2 text-muted-foreground flex-wrap">
@@ -255,7 +396,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                         <div className="flex gap-3">
                             <Button
                                 size="lg"
-                                className="gap-2 shadow-lg shadow-primary/25"
+                                className="gap-2 shadow-sm"
                                 disabled={availableNow <= 0}
                                 onClick={() => bookingSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
                             >
@@ -271,15 +412,40 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                 <div className="grid gap-8 lg:grid-cols-3">
                     <div className="lg:col-span-2 space-y-6">
                         <div className="grid gap-4 sm:grid-cols-3">
-                            <Card><CardContent className="p-4 text-center"><Zap className="h-6 w-6 text-primary mx-auto mb-1" /><p className="text-2xl font-bold">{totalChargingPoints}</p><p className="text-xs text-muted-foreground">Total Charging Points</p></CardContent></Card>
-                            <Card><CardContent className="p-4 text-center"><Clock className="h-6 w-6 text-primary mx-auto mb-1" /><p className="text-2xl font-bold">{availableNow}</p><p className="text-xs text-muted-foreground">Available Now</p></CardContent></Card>
-                            <Card><CardContent className="p-4 text-center"><Timer className="h-6 w-6 text-primary mx-auto mb-1" /><p className="text-2xl font-bold">{occupiedNow}</p><p className="text-xs text-muted-foreground">Occupied Now</p></CardContent></Card>
+                            <Card className="border-primary/30 bg-primary/5"><CardContent className="p-4 text-center"><Zap className="h-6 w-6 text-primary mx-auto mb-1" /><p className="text-2xl font-bold">{totalChargingPoints}</p><p className="text-xs text-muted-foreground">Total Points</p></CardContent></Card>
+                            <Card className="border-emerald-400/30 bg-emerald-500/5"><CardContent className="p-4 text-center"><Clock className="h-6 w-6 text-emerald-600 mx-auto mb-1" /><p className="text-2xl font-bold">{availableNow}</p><p className="text-xs text-muted-foreground">Available Now</p></CardContent></Card>
+                            <Card className="border-amber-400/30 bg-amber-500/5"><CardContent className="p-4 text-center"><Timer className="h-6 w-6 text-amber-600 mx-auto mb-1" /><p className="text-2xl font-bold">{occupiedNow}</p><p className="text-xs text-muted-foreground">Occupied Now</p></CardContent></Card>
                         </div>
 
-                        <Card ref={bookingSectionRef} id="booking-section">
-                            <CardHeader><CardTitle>Book Slot</CardTitle></CardHeader>
+                        <Card ref={bookingSectionRef} id="booking-section" className="border-primary/20 shadow-sm">
+                            <CardHeader className="border-b border-border/60 bg-muted/20">
+                                <CardTitle className="text-xl">Book Slot</CardTitle>
+                            </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid gap-4 sm:grid-cols-3">
+                                    <div className="space-y-2 sm:col-span-3">
+                                        <Label>Predefined Slot (optional)</Label>
+                                        <Select value={selectedSlotId} onValueChange={setSelectedSlotId}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select an available slot" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="manual">Manual Date & Time</SelectItem>
+                                                {availableSlots.map((slot) => {
+                                                    const slotStart = new Date(slot.startTime);
+                                                    const slotEnd = new Date(slot.endTime);
+                                                    return (
+                                                        <SelectItem key={slot._id} value={slot._id}>
+                                                            {slotStart.toLocaleDateString()} {slotStart.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} - {slotEnd.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                                        </SelectItem>
+                                                    );
+                                                })}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-muted-foreground">
+                                            Pick a predefined slot or continue with manual booking.
+                                        </p>
+                                    </div>
                                     <div className="space-y-2">
                                         <Label>Date</Label>
                                         <Input type="date" value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} />
@@ -289,63 +455,95 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                         <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Booking Duration (hours)</Label>
+                                        <Label>Duration (hours)</Label>
                                         <Input type="number" min="1" max="12" value={durationHours} onChange={(e) => setDurationHours(e.target.value)} />
                                     </div>
                                 </div>
 
                                 {bookingSummary && (
-                                    <div className="rounded-lg bg-muted/40 border border-border p-3 text-sm">
+                                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
                                         <p className="font-medium mb-1">Booking Summary</p>
                                         <p>Date: {bookingSummary.start.toLocaleDateString()}</p>
                                         <p>Start: {bookingSummary.start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
                                         <p>End: {bookingSummary.end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
                                         <p>Duration: {bookingSummary.hours} hour(s)</p>
-                                        <p className="font-semibold text-primary mt-1">Price per kWh: {formatLkr(station.pricePerKwh)}</p>
+                                        <p className="font-semibold text-primary mt-1">Price: {formatLkr(station.pricePerKwh)}</p>
                                     </div>
                                 )}
 
-                                <div className="rounded-lg border p-3 text-sm">
-                                    <p className="font-medium mb-2">Availability Result</p>
+                                <div className="rounded-xl border border-border bg-background p-4 text-sm">
+                                    <p className="font-medium mb-2">Availability</p>
                                     {checkingAvailability ? (
-                                        <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Checking availability...</div>
+                                        <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Checking...</div>
                                     ) : bookingAvailability ? (
                                         <div className="space-y-1">
-                                            <p>Total Charging Points: {bookingAvailability.totalChargingPoints}</p>
-                                            <p>Available for selected time: {bookingAvailability.availablePoints}</p>
-                                            <p>Occupied for selected time: {bookingAvailability.occupiedPoints}</p>
+                                            <p>Total Points: {bookingAvailability.totalChargingPoints}</p>
+                                            <p>Available: {bookingAvailability.availablePoints}</p>
+                                            <p>Occupied: {bookingAvailability.occupiedPoints}</p>
                                             <p className={bookingAvailability.canBook ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
                                                 {bookingAvailability.canBook ? "Available" : "Fully Booked for selected time"}
                                             </p>
                                         </div>
                                     ) : (
-                                        <p className="text-muted-foreground">Select date and time to check availability.</p>
+                                        <p className="text-muted-foreground">Select date and time to check.</p>
                                     )}
                                 </div>
 
                                 <Button
                                     onClick={handleBook}
-                                    disabled={
-                                        submittingBooking ||
-                                        !bookingAvailability ||
-                                        !bookingAvailability.canBook
-                                    }
-                                    className="w-full"
+                                    disabled={submittingBooking || !bookingAvailability || !bookingAvailability.canBook}
+                                    className="w-full h-11 text-base font-semibold"
                                 >
-                                    {submittingBooking ? "Confirming..." : "Confirm Booking"}
+                                    {submittingBooking ? "Processing..." : "Confirm & Pay"}
                                 </Button>
+
+                                {paymentStatus === "success" && (
+                                    <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+                                        <p className="font-medium">Payment Successful</p>
+                                        <p>Your booking has been confirmed.</p>
+                                    </div>
+                                )}
+                                {paymentStatus === "dismissed" && (
+                                    <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-700">
+                                        <p className="font-medium">Payment Cancelled</p>
+                                        <p>You closed the payment window.</p>
+                                    </div>
+                                )}
+                                {paymentStatus === "error" && (
+                                    <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                                        <p className="font-medium">Payment Failed</p>
+                                        <p>Something went wrong. Please try again.</p>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
 
-                        <Card>
+                        <Card className="shadow-sm">
                             <CardHeader><CardTitle>Reviews ({reviews.length})</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
                                 {isSignedIn && (
                                     <form onSubmit={handleReview} className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
                                         <div className="flex gap-3">
-                                            <select className="h-10 rounded-lg border border-input bg-background px-3 text-sm" value={reviewRating} onChange={(e) => setReviewRating(e.target.value)}>
-                                                {[5, 4, 3, 2, 1].map((r) => <option key={r} value={r}>{r} Stars</option>)}
-                                            </select>
+                                            <div className="flex items-center gap-1 rounded-lg border border-input bg-background px-2">
+                                                {[1, 2, 3, 4, 5].map((rating) => (
+                                                    <button
+                                                        key={rating}
+                                                        type="button"
+                                                        onClick={() => setReviewRating(rating)}
+                                                        className="p-1"
+                                                        aria-label={`Rate ${rating} star${rating > 1 ? "s" : ""}`}
+                                                        title={`${rating} Star${rating > 1 ? "s" : ""}`}
+                                                    >
+                                                        <Star
+                                                            className={`h-5 w-5 ${
+                                                                rating <= reviewRating
+                                                                    ? "fill-yellow-500 text-yellow-500"
+                                                                    : "text-muted-foreground"
+                                                            }`}
+                                                        />
+                                                    </button>
+                                                ))}
+                                            </div>
                                             <Textarea placeholder="Write your review..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} className="flex-1" required />
                                         </div>
                                         <Button type="submit" size="sm">Submit Review</Button>
@@ -356,7 +554,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                     <p className="text-muted-foreground text-center py-4">No reviews yet.</p>
                                 ) : (
                                     reviews.map((r) => (
-                                        <div key={r._id} className="flex gap-3 p-3 rounded-lg hover:bg-muted/30">
+                                        <div key={r._id} className="flex gap-3 p-3 rounded-lg">
                                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">
                                                 {r.userId?.name?.charAt(0) || "U"}
                                             </div>
@@ -385,16 +583,16 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                 location: station.location,
                             }] : []}
                             center={{ lat: station.location.latitude, lng: station.location.longitude }}
-                            className="h-[250px]"
+                            className="h-[250px] rounded-xl overflow-hidden border border-border shadow-sm"
                         />
-                        <Card>
+                        <Card className="shadow-sm">
                             <CardHeader><CardTitle className="text-base">Station Info</CardTitle></CardHeader>
                             <CardContent className="space-y-3 text-sm">
                                 <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /><span>{station.city}</span></div>
                                 {station.address && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /><span>{station.address}</span></div>}
                                 <div className="flex items-center gap-2"><User className="h-4 w-4 text-primary" /><span>{station.ownerId?.name || "Owner"}</span></div>
                                 <div className="flex items-center gap-2"><Zap className="h-4 w-4 text-primary" /><span>{station.chargerType} Charger</span></div>
-                                <div className="text-sm text-muted-foreground">Price per kWh: {formatLkr(station.pricePerKwh)}</div>
+                                <div className="text-sm text-muted-foreground">Price: {formatLkr(station.pricePerKwh)}</div>
                                 {station.description && (
                                     <div className="rounded-lg bg-muted/30 p-3 text-sm text-muted-foreground">
                                         {station.description}

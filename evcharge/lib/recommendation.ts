@@ -27,7 +27,7 @@ function haversineDistance(
     lat2: number,
     lng2: number
 ): number {
-    const R = 6371; // Earth radius in km
+    const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLng = ((lng2 - lng1) * Math.PI) / 180;
     const a =
@@ -57,24 +57,19 @@ export function getRecommendedStations(
                 station.location.longitude
             );
 
-            // Distance Score: closer = better (1.0 at 0km, 0.0 at maxDistance)
             const distanceScore = Math.max(0, 1 - distanceKm / maxDistance);
 
-            // Availability Score: more available slots = better
             const availabilityScore =
                 station.totalSlotCount > 0
                     ? station.availableSlots / station.totalSlotCount
                     : 0;
 
-            // Vehicle Range Compatibility: can the vehicle reach this station?
             const rangeCompatibility = vehicleRange > 0
                 ? Math.min(1, vehicleRange / (distanceKm * 1.2))
                 : 1;
-
-            // Station Rating: normalized to 0-1
+            
             const ratingScore = station.rating / 5;
 
-            // Weighted score
             const score =
                 0.4 * distanceScore +
                 0.3 * availabilityScore +

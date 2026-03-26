@@ -22,14 +22,12 @@ export async function GET() {
         const completedBookings = await Booking.countDocuments({ status: "COMPLETED" });
         const cancelledBookings = await Booking.countDocuments({ status: "CANCELLED" });
 
-        // Revenue
         const revenueResult = await Booking.aggregate([
             { $match: { status: { $in: ["CONFIRMED", "COMPLETED"] } } },
             { $group: { _id: null, total: { $sum: "$amount" } } },
         ]);
         const totalRevenue = revenueResult[0]?.total || 0;
 
-        // Most booked stations
         const mostBooked = await Booking.aggregate([
             { $group: { _id: "$stationId", bookings: { $sum: 1 } } },
             { $sort: { bookings: -1 } },
@@ -52,7 +50,6 @@ export async function GET() {
             },
         ]);
 
-        // Peak booking hours
         const peakHours = await Booking.aggregate([
             {
                 $group: {
@@ -64,7 +61,6 @@ export async function GET() {
             { $limit: 5 },
         ]);
 
-        // Users by role
         const usersByRole = await User.aggregate([
             { $group: { _id: "$role", count: { $sum: 1 } } },
         ]);

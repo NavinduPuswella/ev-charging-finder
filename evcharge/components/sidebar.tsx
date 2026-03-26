@@ -46,7 +46,7 @@ export default function Sidebar({ role }: SidebarProps) {
     const items = menuItems[role] || menuItems.USER;
 
     return (
-        <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-sidebar-background min-h-[calc(100vh-4rem)]">
+        <aside className="hidden lg:flex w-64 flex-col border-r border-sidebar-border bg-sidebar-background min-h-[calc(100vh-4rem)]">
             <div className="p-4">
                 <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 px-3">
                     {role === "ADMIN" ? "Admin Panel" : role === "STATION_OWNER" ? "Owner Panel" : "Dashboard"}
@@ -58,10 +58,10 @@ export default function Sidebar({ role }: SidebarProps) {
                             <Link
                                 key={href}
                                 href={href}
-                                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${isActive
-                                    ? "bg-primary text-primary-foreground shadow-sm"
-                                    : "text-sidebar-foreground hover:bg-sidebar-accent"
-                                    }`}
+                                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive
+                                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                }`}
                             >
                                 <Icon className="h-4 w-4" />
                                 {label}

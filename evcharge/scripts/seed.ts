@@ -1,17 +1,8 @@
-/**
- * Database Seed Script
- * 
- * Tests the MongoDB connection and populates the database with initial data.
- * 
- * Usage: npx tsx scripts/seed.ts
- */
-
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import path from "path";
 
-// Load environment variables from .env.local
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -21,7 +12,6 @@ if (!MONGODB_URI) {
     process.exit(1);
 }
 
-// ─── Schemas (inline to avoid Next.js import issues) ────────────────────────
 
 const UserSchema = new mongoose.Schema(
     {
@@ -67,11 +57,9 @@ const User = mongoose.models.User || mongoose.model("User", UserSchema);
 const Station = mongoose.models.Station || mongoose.model("Station", StationSchema);
 const Slot = mongoose.models.Slot || mongoose.model("Slot", SlotSchema);
 
-// ─── Seed Data ──────────────────────────────────────────────────────────────
-
 async function seed() {
     console.log("🔌 Connecting to MongoDB...");
-    console.log(`   URI: ${MONGODB_URI!.replace(/\/\/[^:]+:[^@]+@/, "//***:***@")}`); // Hide credentials
+    console.log(`   URI: ${MONGODB_URI!.replace(/\/\/[^:]+:[^@]+@/, "//***:***@")}`);
 
     try {
         await mongoose.connect(MONGODB_URI!);
@@ -85,7 +73,6 @@ async function seed() {
     const dbName = mongoose.connection.db?.databaseName;
     console.log(`📦 Database: ${dbName}\n`);
 
-    // ── Create Admin User ───────────────────────────────────────────────────
     console.log("👤 Creating Admin user...");
     const adminPassword = await bcrypt.hash("admin123", 12);
     const admin = await User.findOneAndUpdate(
@@ -100,7 +87,6 @@ async function seed() {
     );
     console.log(`   ✅ Admin: admin@evcharge.com / admin123  (ID: ${admin._id})\n`);
 
-    // ── Create Station Owner ────────────────────────────────────────────────
     console.log("👤 Creating Station Owner user...");
     const ownerPassword = await bcrypt.hash("owner123", 12);
     const owner = await User.findOneAndUpdate(
@@ -115,7 +101,6 @@ async function seed() {
     );
     console.log(`   ✅ Owner: owner@evcharge.com / owner123  (ID: ${owner._id})\n`);
 
-    // ── Create Regular User ─────────────────────────────────────────────────
     console.log("👤 Creating Regular user...");
     const userPassword = await bcrypt.hash("user123", 12);
     const regularUser = await User.findOneAndUpdate(
@@ -130,7 +115,6 @@ async function seed() {
     );
     console.log(`   ✅ User: user@evcharge.com / user123  (ID: ${regularUser._id})\n`);
 
-    // ── Create Sample Stations ──────────────────────────────────────────────
     console.log("⚡ Creating sample stations...");
 
     const stationsData = [
@@ -183,7 +167,6 @@ async function seed() {
         );
         console.log(`   ✅ Station: ${station.name} (${station.city})`);
 
-        // Create slots for this station
         const now = new Date();
         for (let i = 0; i < station.totalSlots; i++) {
             const startTime = new Date(now);
@@ -205,7 +188,6 @@ async function seed() {
         console.log(`      📋 Created ${station.totalSlots} time slots`);
     }
 
-    // ── Summary ─────────────────────────────────────────────────────────────
     const userCount = await User.countDocuments();
     const stationCount = await Station.countDocuments();
     const slotCount = await Slot.countDocuments();

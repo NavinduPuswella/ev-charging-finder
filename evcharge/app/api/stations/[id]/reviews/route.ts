@@ -35,21 +35,22 @@ export async function POST(
         await dbConnect();
         const { id } = await params;
 
-        // Check if user has a completed booking at this station
-        const completedBooking = await Booking.findOne({
+        const eligibleBooking = await Booking.findOne({
             userId: user.userId,
             stationId: id,
-            status: "COMPLETED",
+            paymentStatus: "PAID",
+            status: { $in: ["CONFIRMED", "COMPLETED"] },
         });
 
-        if (!completedBooking) {
+        if (!eligibleBooking) {
             return NextResponse.json(
-                { error: "You can only review stations where you have a completed booking" },
+                {
+                    error: "You can only review stations where you have a paid booking",
+                },
                 { status: 403 }
             );
         }
 
-        // Check for existing review
         const existingReview = await Review.findOne({
             userId: user.userId,
             stationId: id,
@@ -70,7 +71,6 @@ export async function POST(
             comment: body.comment,
         });
 
-        // Update station average rating
         const allReviews = await Review.find({ stationId: id });
         const avgRating =
             allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;

@@ -96,7 +96,6 @@ export async function PUT(
                     : body.location,
         };
 
-        // Admin can edit any station; owners can only edit their own
         const query = user.role === "ADMIN"
             ? { _id: id }
             : { _id: id, ownerId: user.userId };

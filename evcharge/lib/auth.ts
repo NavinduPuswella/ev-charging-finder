@@ -9,21 +9,15 @@ export interface AuthUser {
     clerkId: string;
 }
 
-/**
- * Get the authenticated user from Clerk and ensure they have a matching MongoDB record.
- * Auto-creates a MongoDB User document on first sign-in.
- */
 export async function getAuthUser(): Promise<AuthUser | null> {
     const { userId: clerkId } = await auth();
     if (!clerkId) return null;
 
     await dbConnect();
 
-    // Try to find existing user by clerkId
     let user = await User.findOne({ clerkId });
 
     if (!user) {
-        // First time sign-in: create a MongoDB user from Clerk profile
         const clerkUser = await currentUser();
         if (!clerkUser) return null;
 

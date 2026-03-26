@@ -33,7 +33,6 @@ export async function GET(request: Request) {
 
         let stations = await Station.find(filter).populate("ownerId", "name email");
 
-        // Distance filter if lat/lng provided
         if (lat && lng) {
             const userLat = parseFloat(lat);
             const userLng = parseFloat(lng);
@@ -99,6 +98,22 @@ export async function POST(request: Request) {
         const totalChargingPoints = Number(
             body.totalChargingPoints ?? body.totalSlots
         );
+        const latitude = Number(body.latitude ?? body.location?.latitude);
+        const longitude = Number(body.longitude ?? body.location?.longitude);
+
+        if (
+            !Number.isFinite(latitude) ||
+            !Number.isFinite(longitude) ||
+            latitude < -90 ||
+            latitude > 90 ||
+            longitude < -180 ||
+            longitude > 180
+        ) {
+            return NextResponse.json(
+                { error: "Invalid station coordinates. Please provide valid latitude and longitude." },
+                { status: 400 }
+            );
+        }
 
         const isAdmin = user.role === "ADMIN";
 
@@ -113,8 +128,8 @@ export async function POST(request: Request) {
             status: body.status || "AVAILABLE",
             description: body.description,
             location: {
-                latitude: Number(body.latitude ?? body.location?.latitude),
-                longitude: Number(body.longitude ?? body.location?.longitude),
+                latitude,
+                longitude,
             },
             ownerId: body.ownerId || user.userId,
             isApproved: isAdmin ? true : false,

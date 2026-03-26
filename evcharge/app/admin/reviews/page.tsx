@@ -66,7 +66,6 @@ export default function ReviewsPage() {
                 <p className="text-muted-foreground">EV charging station ratings and reviews</p>
             </div>
 
-            {/* Rating Summary */}
             <Card className="border-0 shadow-md">
                 <CardContent className="p-6">
                     <div className="flex flex-col md:flex-row md:items-center gap-6">
@@ -96,7 +95,6 @@ export default function ReviewsPage() {
                 </CardContent>
             </Card>
 
-            {/* Reviews List */}
             <div>
                 <h2 className="text-lg font-semibold mb-3">All Reviews ({reviews.length})</h2>
                 {reviews.length === 0 ? (

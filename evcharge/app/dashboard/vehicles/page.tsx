@@ -113,32 +113,32 @@ export default function VehiclesPage() {
             ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {vehicles.map((v) => (
-                        <Card key={v._id} className="group hover:shadow-lg transition-all">
-                            <div className="h-1.5 bg-gradient-to-r from-green-400 to-green-600" />
+                        <Card key={v._id}>
+                            <div className="h-1 bg-primary" />
                             <CardHeader className="pb-3">
                                 <div className="flex items-start justify-between">
                                     <CardTitle className="text-lg flex items-center gap-2">
                                         <Car className="h-5 w-5 text-primary" />
                                         {v.model}
                                     </CardTitle>
-                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(v._id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(v._id)} className="h-8 w-8 text-muted-foreground">
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="grid grid-cols-3 gap-3">
-                                    <div className="flex flex-col items-center p-3 rounded-xl bg-muted/50">
+                                    <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50">
                                         <Battery className="h-5 w-5 text-primary mb-1" />
                                         <span className="text-lg font-bold">{v.batteryCapacity}</span>
                                         <span className="text-xs text-muted-foreground">kWh</span>
                                     </div>
-                                    <div className="flex flex-col items-center p-3 rounded-xl bg-muted/50">
+                                    <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50">
                                         <Gauge className="h-5 w-5 text-primary mb-1" />
                                         <span className="text-lg font-bold">{v.rangeKm}</span>
                                         <span className="text-xs text-muted-foreground">km</span>
                                     </div>
-                                    <div className="flex flex-col items-center p-3 rounded-xl bg-muted/50">
+                                    <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50">
                                         <Zap className="h-5 w-5 text-primary mb-1" />
                                         <span className="text-sm font-bold">{v.chargingType}</span>
                                         <span className="text-xs text-muted-foreground">Charger</span>
