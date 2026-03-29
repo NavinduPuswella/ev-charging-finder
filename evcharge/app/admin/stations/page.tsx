@@ -18,6 +18,7 @@ import {
 import {
     Search, MapPin, Zap, Pencil, Power, ShieldCheck, X, Plus, Loader2, Trash2, Navigation,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Station {
     _id: string;
@@ -91,13 +92,14 @@ export default function StationsManagementPage() {
             });
             if (res.ok) {
                 setStations((prev) => prev.map((s) => s._id === id ? { ...s, isApproved: newApproved } : s));
+                toast.success(newApproved ? "Station enabled" : "Station disabled");
             } else {
                 const data = await res.json();
-                alert(data.error || "Failed to update station status");
+                toast.error(data.error || "Failed to update station status");
             }
         } catch (err) {
             console.error("Failed to toggle station:", err);
-            alert("Network error. Please try again.");
+            toast.error("Network error. Please try again.");
         }
     };
 
@@ -136,13 +138,14 @@ export default function StationsManagementPage() {
             const res = await fetch(`/api/admin/stations?stationId=${deleteId}`, { method: "DELETE" });
             if (res.ok) {
                 setStations((prev) => prev.filter((s) => s._id !== deleteId));
+                toast.success("Station deleted");
             } else {
                 const data = await res.json();
-                alert(data.error || "Failed to delete station");
+                toast.error(data.error || "Failed to delete station");
             }
         } catch (err) {
             console.error("Failed to delete station:", err);
-            alert("Network error. Please try again.");
+            toast.error("Network error. Please try again.");
         } finally {
             setDeleting(false);
             setDeleteId(null);
@@ -169,12 +172,13 @@ export default function StationsManagementPage() {
                 setDialogOpen(false);
                 setForm(emptyForm);
                 fetchStations();
+                toast.success("Station created");
             } else {
-                alert(data.error || "Failed to create station");
+                toast.error(data.error || "Failed to create station");
             }
         } catch (err) {
             console.error("Failed to create station:", err);
-            alert("Network error. Please try again.");
+            toast.error("Network error. Please try again.");
         } finally {
             setSubmitting(false);
         }

@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BookingCard from "@/components/booking-card";
 import { CalendarCheck } from "lucide-react";
+import { toast } from "sonner";
 
 interface Booking {
     _id: string;
@@ -42,13 +43,14 @@ export default function BookingsPage() {
         });
         if (!res.ok) {
             const data = await res.json();
-            alert(data.error || "Unable to cancel booking");
+            toast.error(data.error || "Unable to cancel booking");
             return;
         }
 
         setBookings((prev) =>
             prev.map((b) => (b._id === id ? { ...b, status: "CANCELLED", paymentStatus: "REFUNDED" } : b))
         );
+        toast.success("Booking cancelled");
     };
 
     if (loading) {

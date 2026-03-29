@@ -30,7 +30,7 @@ export default function Navbar() {
     const [role, setRole] = useState<string>("USER");
     const [scrolled, setScrolled] = useState(false);
     const [mounted, setMounted] = useState(false);
-    const isHome = pathname === "/" || pathname === "/contact";
+    const isHome = pathname === "/";
 
     useEffect(() => {
         setMounted(true);
@@ -91,8 +91,13 @@ export default function Navbar() {
         }`}>
             <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
                 <Link href="/" className="flex items-center gap-2">
-                    <span className={`text-xl font-bold tracking-tight transition-colors duration-300 ${isTransparent ? "text-white" : "text-foreground"}`}>
-                        EV<span className="text-primary">Charge</span>
+                    <span className="text-xl font-bold tracking-tight">
+                        <span className={`transition-colors duration-300 ${isTransparent ? "text-white" : "text-foreground"}`}>
+                            Charge
+                        </span>
+                        <span className={`transition-colors duration-300 ${isTransparent ? "text-green-400" : "text-green-600"}`}>
+                            X
+                        </span>
                     </span>
                 </Link>
 

@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/select";
 import {
     Route, MapPin, Zap, Star, Navigation, Loader2, Battery,
-    Search, CalendarCheck, Sparkles, SearchX, AlertTriangle, Map, ShieldCheck,
-    Clock3, Gauge, TrendingUp,
+    Search, CalendarCheck, SearchX, AlertTriangle, Map,
+    Clock3, Gauge, Bot, Coins, ArrowRight, CircleDot, SlidersHorizontal,
 } from "lucide-react";
 
 const CHARGER_TYPES = ["CCS", "CHAdeMO", "Type1", "Type2", "Tesla"];
@@ -37,6 +37,8 @@ interface RouteStation {
     location: { latitude: number; longitude: number };
     distanceToRouteKm: number;
     distanceFromStartKm: number;
+    estimatedWaitMinutes: number;
+    estimatedChargeCostLkr: number;
 }
 
 interface TripPlanResponse {
@@ -53,6 +55,20 @@ interface TripPlanResponse {
     };
     stationsOnRoute: RouteStation[];
     recommendedStops: RouteStation[];
+    aiOptimization?: {
+        provider: "google-gemini" | "heuristic-fallback";
+        enabled: boolean;
+        summary: string;
+        scoreBreakdown: Array<{
+            stationId: string;
+            stationName: string;
+            waitScore: number;
+            costScore: number;
+            detourScore: number;
+            overallScore: number;
+            reason: string;
+        }>;
+    };
 }
 
 async function geocodeLocation(query: string): Promise<Coordinates | null> {
@@ -163,64 +179,83 @@ export default function TripPlanner() {
         () => result?.recommendedStops.map((station) => station._id) || [],
         [result]
     );
+    const hasPlannedOnce = loading || hasSearched;
+    const hasRoute = !!result && !loading;
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100/70">
-            <section className="border-b border-border/50 bg-background/80 backdrop-blur">
-                <div className="mx-auto max-w-7xl px-4 pb-8 pt-28 sm:px-6 lg:px-8">
-                    <Badge variant="outline" className="mb-4 border-primary/30 bg-primary/5 text-primary">
-                        <Route className="mr-1 h-3.5 w-3.5" />
-                        EV Trip Planner
-                    </Badge>
-                    <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">Plan Better Charging Stops</h1>
-                    <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
-                        Enter your start and destination, and get route-aware station recommendations, safety guidance, and direct booking shortcuts.
-                    </p>
-                    <div className="mt-5 flex flex-wrap gap-2">
-                        <Badge variant="secondary" className="gap-1.5"><ShieldCheck className="h-3.5 w-3.5" /> Route-Safe Suggestions</Badge>
-                        <Badge variant="secondary" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" /> Smart Stop Ranking</Badge>
-                        <Badge variant="secondary" className="gap-1.5"><CalendarCheck className="h-3.5 w-3.5" /> Quick Pre-Booking</Badge>
+        <div className="min-h-screen bg-slate-50">
+            <section className="border-b bg-white">
+                <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-10 pt-28 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
+                    <div>
+                        <Badge variant="outline" className="mb-4">
+                            <Route className="mr-1 h-3.5 w-3.5" />
+                            Trip Planner
+                        </Badge>
+                        <h1 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl">Plan your EV journey with confidence</h1>
+                        <p className="mt-4 max-w-2xl text-sm text-muted-foreground sm:text-base">
+                            Enter your route and charging preferences to find stations that fit your trip, budget, and timing.
+                        </p>
+                    </div>
+                    <div className="grid w-full max-w-md grid-cols-3 gap-3">
+                        <HeaderMetric label="Connector types" value={`${CHARGER_TYPES.length}`} />
+                        <HeaderMetric label="Range default" value="250 km" />
+                        <HeaderMetric label="Corridor" value="7 km" />
                     </div>
                 </div>
             </section>
 
-            <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
                 <div className="grid gap-6 lg:grid-cols-12">
-                    <div className="lg:col-span-4">
-                        <Card className="sticky top-24 overflow-hidden border-primary/20 shadow-lg shadow-primary/5">
-                            <div className="h-1 bg-gradient-to-r from-primary via-blue-500 to-emerald-500" />
-                            <CardContent className="p-5">
-                                <div className="mb-5">
-                                    <p className="text-sm font-semibold text-foreground">Trip inputs</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Tune route filters to get realistic charging options.
-                                    </p>
+                    <div className="lg:col-span-5 xl:col-span-4">
+                        <Card className="sticky top-24 border bg-white">
+                            <CardContent className="p-5 sm:p-6">
+                                <div className="mb-5 flex items-start justify-between gap-3">
+                                    <div>
+                                        <p className="text-base font-semibold text-foreground">Trip setup</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Fill the route details and planner filters.
+                                        </p>
+                                    </div>
+                                    <Badge variant="secondary" className="gap-1">
+                                        <SlidersHorizontal className="h-3 w-3" />
+                                        Inputs
+                                    </Badge>
                                 </div>
 
-                                <form onSubmit={handleSearch} className="space-y-4">
-                                    <Field label="Origin" icon={<Navigation className="h-3.5 w-3.5 text-primary" />}>
-                                        <Input
-                                            placeholder="e.g. Colombo Fort"
-                                            value={originText}
-                                            onChange={(e) => {
-                                                setOriginText(e.target.value);
-                                                setOriginCoords(null);
-                                            }}
-                                            className="h-11"
-                                        />
-                                    </Field>
-
-                                    <Field label="Destination" icon={<MapPin className="h-3.5 w-3.5 text-red-500" />}>
-                                        <Input
-                                            placeholder="e.g. Kandy Clock Tower"
-                                            value={destinationText}
-                                            onChange={(e) => {
-                                                setDestinationText(e.target.value);
-                                                setDestinationCoords(null);
-                                            }}
-                                            className="h-11"
-                                        />
-                                    </Field>
+                                <form onSubmit={handleSearch} className="space-y-5">
+                                    <div className="rounded-xl border border-dashed p-3">
+                                        <div className="flex items-start gap-2">
+                                            <CircleDot className="mt-0.5 h-4 w-4 text-emerald-600" />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-xs font-medium text-muted-foreground">Origin</p>
+                                                <Input
+                                                    placeholder="e.g. Colombo Fort"
+                                                    value={originText}
+                                                    onChange={(e) => {
+                                                        setOriginText(e.target.value);
+                                                        setOriginCoords(null);
+                                                    }}
+                                                    className="mt-2 h-11"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="my-2 ml-2 h-4 w-px bg-border" />
+                                        <div className="flex items-start gap-2">
+                                            <MapPin className="mt-0.5 h-4 w-4 text-rose-600" />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-xs font-medium text-muted-foreground">Destination</p>
+                                                <Input
+                                                    placeholder="e.g. Kandy Clock Tower"
+                                                    value={destinationText}
+                                                    onChange={(e) => {
+                                                        setDestinationText(e.target.value);
+                                                        setDestinationCoords(null);
+                                                    }}
+                                                    className="mt-2 h-11"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
 
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                                         <Field label="Vehicle Range (km)" icon={<Battery className="h-3.5 w-3.5 text-primary" />}>
@@ -261,7 +296,7 @@ export default function TripPlanner() {
                                         </Select>
                                     </Field>
 
-                                    <div className="flex flex-wrap gap-2 pt-1">
+                                    <div className="flex flex-wrap gap-2">
                                         <Button
                                             type="button"
                                             variant="outline"
@@ -277,11 +312,7 @@ export default function TripPlanner() {
                                         </Button>
                                     </div>
 
-                                    <Button
-                                        type="submit"
-                                        className="h-12 w-full gap-2 text-base font-semibold"
-                                        disabled={loading || !originText || !destinationText}
-                                    >
+                                    <Button type="submit" className="h-12 w-full gap-2 text-base font-semibold" disabled={loading || !originText || !destinationText}>
                                         {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
                                         {loading ? "Planning your route..." : "Plan EV Trip"}
                                     </Button>
@@ -290,11 +321,20 @@ export default function TripPlanner() {
                         </Card>
                     </div>
 
-                    <div className="space-y-6 lg:col-span-8">
-                        <Card className="overflow-hidden border-border/60 bg-white/90">
+                    <div className="space-y-6 lg:col-span-7 xl:col-span-8">
+                        <Card className="overflow-hidden border bg-white">
+                            <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5">
+                                <div className="flex items-center gap-2">
+                                    <Route className="h-4 w-4 text-primary" />
+                                    <p className="text-sm font-medium">Route preview</p>
+                                </div>
+                                <Badge variant={hasRoute ? "secondary" : "outline"}>
+                                    {hasRoute ? "Route ready" : "Waiting for input"}
+                                </Badge>
+                            </div>
                             <CardContent className="p-0">
                                 {loading ? (
-                                    <div className="flex h-[420px] items-center justify-center">
+                                    <div className="flex h-[420px] items-center justify-center bg-muted/20">
                                         <Loader2 className="h-10 w-10 animate-spin text-primary" />
                                     </div>
                                 ) : result ? (
@@ -307,30 +347,31 @@ export default function TripPlanner() {
                                         highlightedStationIds={highlightedStationIds}
                                     />
                                 ) : (
-                                    <div className="flex h-[420px] flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-white px-6 text-center">
-                                        <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-3">
+                                    <div className="flex h-[420px] flex-col items-center justify-center bg-muted/20 px-6 text-center">
+                                        <div className="mb-4 rounded-xl border bg-background p-3">
                                             <Route className="h-8 w-8 text-primary" />
                                         </div>
                                         <p className="text-lg font-semibold">Your route preview appears here</p>
                                         <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                                            Start by entering origin and destination, then plan your trip to see stations and suggested stops on the map.
+                                            Add origin and destination details, then start planning to see route-aware charging stations.
                                         </p>
                                     </div>
                                 )}
                             </CardContent>
                         </Card>
 
-                        <Card className="border-border/60 bg-white/90">
-                            <CardContent className="p-5">
-                                <p className="text-sm font-semibold text-foreground">How this planner helps</p>
-                                <ul className="mt-4 grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
-                                    <li className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 text-primary" /> Finds stations along your route, not just nearby.</li>
-                                    <li className="flex items-start gap-2"><Gauge className="mt-0.5 h-4 w-4 text-primary" /> Uses your battery range to keep travel realistic.</li>
-                                    <li className="flex items-start gap-2"><TrendingUp className="mt-0.5 h-4 w-4 text-primary" /> Prioritizes practical charging stops first.</li>
-                                    <li className="flex items-start gap-2"><CalendarCheck className="mt-0.5 h-4 w-4 text-primary" /> Lets you pre-book directly from results.</li>
-                                </ul>
-                            </CardContent>
-                        </Card>
+                        {!hasPlannedOnce && (
+                            <Card className="border bg-white">
+                                <CardContent className="p-5">
+                                    <p className="text-sm font-semibold text-foreground">How this planner works</p>
+                                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                        <PlannerStep icon={<MapPin className="h-4 w-4 text-primary" />} title="Define route" description="Set origin and destination for your trip." />
+                                        <PlannerStep icon={<Gauge className="h-4 w-4 text-primary" />} title="Set constraints" description="Add battery range and corridor preferences." />
+                                        <PlannerStep icon={<CalendarCheck className="h-4 w-4 text-primary" />} title="Choose stop" description="Compare stations and pre-book your slot." />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
                         {hasSearched && !loading && (
                             <div className="animate-fade-in space-y-6">
@@ -372,12 +413,27 @@ export default function TripPlanner() {
                                             />
                                         </div>
 
-                                        <div className={`rounded-xl border p-4 ${result.safety.canReachDestination ? "border-primary/30 bg-primary/5" : "border-orange-300 bg-orange-50"}`}>
+                                        <div className={`rounded-xl border p-4 ${result.safety.canReachDestination ? "border-primary/40 bg-primary/5" : "border-orange-300 bg-orange-50/60"}`}>
                                             <p className="text-sm font-semibold">
                                                 {result.safety.canReachDestination ? "Trip is feasible with this plan" : "Trip may not be guaranteed"}
                                             </p>
                                             <p className="mt-1 text-sm text-muted-foreground">{result.safety.note}</p>
                                         </div>
+
+                                        {result.aiOptimization && (
+                                            <div className={`rounded-xl border p-4 ${result.aiOptimization.enabled ? "border-blue-300 bg-blue-50/60" : "border-slate-300 bg-slate-50"}`}>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <p className="flex items-center gap-2 text-sm font-semibold">
+                                                        <Bot className="h-4 w-4 text-blue-600" />
+                                                        Route optimization
+                                                    </p>
+                                                    <Badge variant={result.aiOptimization.enabled ? "secondary" : "outline"}>
+                                                        {result.aiOptimization.enabled ? "Google Gemini" : "Heuristic Fallback"}
+                                                    </Badge>
+                                                </div>
+                                                <p className="mt-2 text-sm text-muted-foreground">{result.aiOptimization.summary}</p>
+                                            </div>
+                                        )}
 
                                         {result.recommendedStops.length > 0 && (
                                             <section>
@@ -428,6 +484,27 @@ export default function TripPlanner() {
     );
 }
 
+function HeaderMetric({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-xl border bg-slate-50 px-3 py-2">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
+        </div>
+    );
+}
+
+function PlannerStep({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
+    return (
+        <div className="rounded-xl border bg-slate-50 p-3">
+            <div className="flex items-center gap-2">
+                {icon}
+                <p className="text-sm font-semibold text-foreground">{title}</p>
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground">{description}</p>
+        </div>
+    );
+}
+
 function Field({ label, icon, children }: { label: string; icon: ReactNode; children: ReactNode }) {
     return (
         <div>
@@ -451,12 +528,12 @@ function StatCard({
     icon: ReactNode;
 }) {
     const toneClass = tone === "primary"
-        ? "border-primary/20 bg-gradient-to-br from-primary/5 to-transparent"
+        ? "border-primary/20 bg-primary/5"
         : tone === "blue"
-            ? "border-blue-200 bg-gradient-to-br from-blue-50 to-transparent"
+            ? "border-blue-200 bg-blue-50/70"
             : tone === "emerald"
-                ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-transparent"
-                : "border-slate-200 bg-gradient-to-br from-slate-100 to-transparent";
+                ? "border-emerald-200 bg-emerald-50/70"
+                : "border-slate-200 bg-slate-100/70";
 
     return (
         <Card className={toneClass}>
@@ -476,24 +553,23 @@ function RouteStopCard({ station, index }: { station: RouteStation; index: numbe
 
     return (
         <div
-            className="animate-fade-in overflow-hidden rounded-xl border border-border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            className="animate-fade-in overflow-hidden rounded-xl border border-border bg-white transition-colors hover:border-primary/50"
             style={{ animationDelay: `${index * 80}ms` }}
         >
-            <div className={`h-1 ${hasAvailable ? "bg-primary" : "bg-orange-400"}`} />
-
             <div className="p-4 sm:p-5">
-                <div className="mb-3 flex items-start justify-between">
+                <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                         <h3 className="truncate text-base font-semibold">{station.name}</h3>
                         <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
                             <MapPin className="h-3.5 w-3.5 shrink-0" />
                             <span className="truncate">{station.city}</span>
-                            <span className="ml-1 whitespace-nowrap font-medium text-primary">{station.distanceFromStartKm.toFixed(1)} km</span>
+                            <ArrowRight className="h-3 w-3" />
+                            <span className="whitespace-nowrap font-medium text-foreground">{station.distanceFromStartKm.toFixed(1)} km</span>
                         </div>
                     </div>
                     <Badge
                         variant={station.availabilityStatus === "Available" ? "success" : station.availabilityStatus === "Limited Availability" ? "warning" : "destructive"}
-                        className="ml-2 shrink-0"
+                        className="shrink-0"
                     >
                         {station.availabilityStatus}
                     </Badge>
@@ -504,27 +580,27 @@ function RouteStopCard({ station, index }: { station: RouteStation; index: numbe
                         <Zap className="h-2.5 w-2.5" /> {station.chargerType}
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                        <Sparkles className="h-2.5 w-2.5" /> {station.distanceToRouteKm.toFixed(1)} km off route
+                        <Map className="h-2.5 w-2.5" /> {station.distanceToRouteKm.toFixed(1)} km off route
                     </span>
                 </div>
 
-                <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <div className="rounded-lg bg-muted/50 p-2.5 text-center">
-                        <div className="text-xs text-muted-foreground">Price</div>
-                        <div className="text-sm font-bold text-foreground">LKR {station.pricePerKwh}</div>
-                        <div className="text-[10px] text-muted-foreground">per kWh</div>
-                    </div>
-                    <div className="rounded-lg bg-muted/50 p-2.5 text-center">
-                        <div className="text-xs text-muted-foreground">Rating</div>
-                        <div className="flex items-center justify-center gap-0.5 text-sm font-bold text-foreground">
-                            <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" /> {station.rating?.toFixed(1) || "—"}
-                        </div>
-                    </div>
-                    <div className="rounded-lg bg-muted/50 p-2.5 text-center">
-                        <div className="text-xs text-muted-foreground">Available</div>
-                        <div className="text-sm font-bold text-foreground">{station.availableNow}/{station.totalChargingPoints}</div>
-                        <div className="text-[10px] text-muted-foreground">points</div>
-                    </div>
+                <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <MetricCell label="Price" value={`LKR ${station.pricePerKwh}`} subLabel="per kWh" />
+                    <MetricCell
+                        label="Rating"
+                        value={station.rating?.toFixed(1) || "—"}
+                        icon={<Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />}
+                    />
+                    <MetricCell label="Available" value={`${station.availableNow}/${station.totalChargingPoints}`} subLabel="points" />
+                    <MetricCell label="Wait" value={`${station.estimatedWaitMinutes} min`} icon={<Clock3 className="h-3 w-3" />} />
+                </div>
+
+                <div className="mb-4 rounded-lg border bg-muted/30 p-3">
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Coins className="h-3 w-3" />
+                        Estimated charge cost
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">LKR {station.estimatedChargeCostLkr}</p>
                 </div>
 
                 <div className="flex gap-2">
@@ -540,6 +616,29 @@ function RouteStopCard({ station, index }: { station: RouteStation; index: numbe
                     </Link>
                 </div>
             </div>
+        </div>
+    );
+}
+
+function MetricCell({
+    label,
+    value,
+    subLabel,
+    icon,
+}: {
+    label: string;
+    value: string;
+    subLabel?: string;
+    icon?: ReactNode;
+}) {
+    return (
+        <div className="rounded-lg border bg-background p-2.5 text-center">
+            <div className="text-xs text-muted-foreground">{label}</div>
+            <div className="mt-0.5 flex items-center justify-center gap-1 text-sm font-bold text-foreground">
+                {icon}
+                <span>{value}</span>
+            </div>
+            {subLabel ? <div className="text-[10px] text-muted-foreground">{subLabel}</div> : null}
         </div>
     );
 }

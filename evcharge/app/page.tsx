@@ -69,13 +69,6 @@ const STEPS = [
   },
 ];
 
-const STATS = [
-  { value: "500+", label: "Charging Stations" },
-  { value: "10K+", label: "EV Drivers" },
-  { value: "50K+", label: "Bookings Made" },
-  { value: "99.8%", label: "Uptime" },
-];
-
 export default function Home() {
   return (
     <div className="flex flex-col">
@@ -94,10 +87,7 @@ export default function Home() {
 
         <div className="relative z-10 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-white/80 backdrop-blur-sm mb-8">
-              <Zap className="h-3.5 w-3.5 text-green-400" />
-              Sri Lanka&apos;s #1 EV Charging Platform
-            </div>
+            
 
             <h1 className="text-5xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl leading-[1.05]">
               Find. Book.
@@ -106,7 +96,7 @@ export default function Home() {
             </h1>
 
             <p className="mt-6 text-lg text-white/60 max-w-lg leading-relaxed">
-              Discover nearby charging stations, reserve slots instantly, and plan your EV trips — all in one place.
+              Discover nearby charging stations, reserve slots instantly, and plan your EV trips all in one place.
             </p>
 
             <div className="mt-10 flex flex-wrap gap-4">
@@ -131,26 +121,6 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border-b border-border bg-muted/50">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4">
-            {STATS.map(({ value, label }, i) => (
-              <div
-                key={label}
-                className={`py-10 px-6 text-center ${
-                  i < STATS.length - 1 ? "border-r border-border" : ""
-                }`}
-              >
-                <p className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
-                  {value}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">{label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section className="py-28 bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-xl mb-16">
@@ -159,7 +129,7 @@ export default function Home() {
               Everything you need to charge with confidence
             </h2>
             <p className="mt-4 text-muted-foreground leading-relaxed">
-              A complete toolkit for EV owners — from finding the right station to managing your entire charging workflow.
+              A complete toolkit for EV owners from finding the right station to managing your entire charging workflow.
             </p>
           </div>
 
@@ -204,12 +174,12 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-16 lg:grid-cols-2 lg:items-center">
             <div>
-              <p className="text-sm font-semibold text-primary mb-3">Why EVCharge</p>
+              <p className="text-sm font-semibold text-primary mb-3">Why ChargeX</p>
               <h2 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
                 The smarter way to keep your EV moving
               </h2>
               <p className="mt-4 text-muted-foreground leading-relaxed max-w-lg">
-                No more range anxiety. EVCharge gives you real-time data, smart recommendations, and guaranteed charging slots wherever you go.
+                No more range anxiety. ChargeX gives you real time data, smart recommendations, and guaranteed charging slots wherever you go.
               </p>
 
               <div className="mt-10 space-y-5">
@@ -238,7 +208,7 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-5">
                 <div className="rounded-2xl border border-border bg-white p-6">
                   <Users className="h-5 w-5 text-primary mb-3" />
-                  <p className="text-2xl font-extrabold text-foreground">10K+</p>
+                  <p className="text-2xl font-extrabold text-foreground">10+</p>
                   <p className="text-xs text-muted-foreground mt-0.5">Active EV drivers</p>
                 </div>
                 <div className="rounded-2xl border border-border bg-white p-6">
@@ -254,10 +224,7 @@ export default function Home() {
 
       <section className="py-28 bg-muted/40">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-4 py-1.5 text-sm text-muted-foreground mb-6">
-            <Zap className="h-3.5 w-3.5 text-primary" />
-            Get started in under a minute
-          </div>
+          
 
           <h2 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
             Ready to charge smarter?
@@ -297,11 +264,12 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 py-16 md:grid-cols-4">
             <div className="md:col-span-1">
-              <span className="text-lg font-bold text-foreground">
-                EV<span className="text-primary">Charge</span>
+              <span className="text-lg font-bold">
+                <span className="text-foreground">Charge</span>
+                <span className="text-green-600">X</span>
               </span>
               <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                Sri Lanka&apos;s smartest EV charging platform. Find, book, and charge — effortlessly.
+                Sri Lanka&apos;s smartest EV charging platform. Find, book, and charge  effortlessly.
               </p>
             </div>
 
@@ -335,7 +303,7 @@ export default function Home() {
           <div className="flex flex-col items-center gap-3 border-t border-border py-8 md:flex-row md:justify-between">
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Clock className="h-3.5 w-3.5" />
-              <span>&copy; 2026 EVCharge. All rights reserved.</span>
+              <span>&copy; 2026 ChargeX. All rights reserved.</span>
             </div>
             <div className="flex gap-6 text-sm text-muted-foreground">
               <Link href="/stations">Stations</Link>

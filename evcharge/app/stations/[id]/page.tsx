@@ -2,13 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MapView from "@/components/map-view";
 import {
@@ -21,8 +20,11 @@ import {
     Loader2,
     Phone,
     Timer,
+    ArrowRight,
+    BatteryCharging,
 } from "lucide-react";
 import { useAuth, useUser } from "@clerk/nextjs";
+import { toast } from "sonner";
 
 interface Station {
     _id: string;
@@ -249,7 +251,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
 
             const bookingData = await bookingRes.json();
             if (!bookingRes.ok) {
-                alert(bookingData.error || "Booking failed");
+                toast.error(bookingData.error || "Booking failed");
                 setSubmittingBooking(false);
                 return;
             }
@@ -271,7 +273,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
 
             const hashData = await hashRes.json();
             if (!hashRes.ok) {
-                alert("Failed to initialize payment");
+                toast.error("Failed to initialize payment");
                 setSubmittingBooking(false);
                 return;
             }
@@ -288,18 +290,20 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                 if (!confirmRes.ok) {
                     setPaymentStatus("error");
                     setSubmittingBooking(false);
-                    alert("Payment completed, but booking confirmation failed. Please contact support.");
+                    toast.error("Payment completed, but booking confirmation failed. Please contact support.");
                     return;
                 }
 
                 setPaymentStatus("success");
                 setSubmittingBooking(false);
+                toast.success("Payment successful. Booking confirmed.");
                 refreshStation();
             };
 
             payhereGlobal.onDismissed = function onDismissed() {
                 setPaymentStatus("dismissed");
                 setSubmittingBooking(false);
+                toast.message("Payment cancelled.");
                 fetch(`/api/bookings/${bookingId}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
@@ -310,6 +314,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
             payhereGlobal.onError = function onError() {
                 setPaymentStatus("error");
                 setSubmittingBooking(false);
+                toast.error("Payment failed. Please try again.");
             };
 
             const payment = {
@@ -334,7 +339,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
 
             payhereGlobal.startPayment(payment);
         } catch {
-            alert("Something went wrong. Please try again.");
+            toast.error("Something went wrong. Please try again.");
             setSubmittingBooking(false);
         }
     };
@@ -351,21 +356,22 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
         if (res.ok) {
             setReviews((prev) => [data.review, ...prev]);
             setReviewComment("");
+            toast.success("Review submitted.");
         } else {
-            alert(data.error || "Failed to submit review");
+            toast.error(data.error || "Failed to submit review");
         }
     };
 
     if (loading) {
         return (
-            <div className="flex justify-center py-20 mt-16">
+            <div className="mt-16 flex justify-center py-20">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
 
     if (!station) {
-        return <div className="flex justify-center py-20 mt-16 text-muted-foreground">Station not found</div>;
+        return <div className="mt-16 flex justify-center py-20 text-muted-foreground">Station not found</div>;
     }
 
     const totalChargingPoints = station.totalChargingPoints || station.totalSlots;
@@ -380,50 +386,74 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
         );
 
     return (
-        <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-background via-background to-muted/20">
-            <div className="border-b border-border bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.12),_transparent_52%)]">
-                <div className="mx-auto max-w-7xl px-4 py-8 pt-24 sm:px-6 lg:px-8">
-                    <div className="flex flex-col gap-6 rounded-2xl border border-border/60 bg-background/85 p-6 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
-                        <div>
-                            <h1 className="text-3xl font-bold">{station.name}</h1>
-                            <div className="flex items-center gap-3 mt-2 text-muted-foreground flex-wrap">
-                                <span className="flex items-center gap-1"><MapPin className="h-4 w-4" />{station.city}</span>
-                                <span className="flex items-center gap-1"><Star className="h-4 w-4 text-yellow-500" />{station.rating.toFixed(1)}</span>
-                                <Badge variant="success"><Zap className="h-3 w-3 mr-1" />{station.chargerType}</Badge>
-                                <Badge variant={getAvailabilityBadge(station.availabilityStatus)}>{station.availabilityStatus}</Badge>
-                            </div>
-                        </div>
-                        <div className="flex gap-3">
-                            <Button
-                                size="lg"
-                                className="gap-2 shadow-sm"
-                                disabled={availableNow <= 0}
-                                onClick={() => bookingSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                            >
-                                <CalendarCheck className="h-5 w-5" />
-                                {availableNow > 0 ? "Book Slot" : "Fully Booked"}
-                            </Button>
+        <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
+            <section className="border-b bg-white">
+                <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-10 pt-24 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
+                    <div>
+                        <Badge variant="outline" className="mb-4">
+                            <BatteryCharging className="mr-1 h-3.5 w-3.5" />
+                            Station Details
+                        </Badge>
+                        <h1 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl">{station.name}</h1>
+                        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border bg-slate-50 px-3 py-1">
+                                <MapPin className="h-3.5 w-3.5" />
+                                {station.city}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-full border bg-slate-50 px-3 py-1">
+                                <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
+                                {station.rating.toFixed(1)}
+                            </span>
+                            <Badge variant="secondary">
+                                <Zap className="mr-1 h-3 w-3" />
+                                {station.chargerType}
+                            </Badge>
+                            <Badge variant={getAvailabilityBadge(station.availabilityStatus)}>
+                                {station.availabilityStatus}
+                            </Badge>
                         </div>
                     </div>
+                    <div className="grid w-full max-w-md grid-cols-3 gap-3">
+                        <HeaderMetric label="Total Points" value={`${totalChargingPoints}`} />
+                        <HeaderMetric label="Available" value={`${availableNow}`} />
+                        <HeaderMetric label="Occupied" value={`${occupiedNow}`} />
+                    </div>
                 </div>
-            </div>
+            </section>
 
             <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-                <div className="grid gap-8 lg:grid-cols-3">
-                    <div className="lg:col-span-2 space-y-6">
-                        <div className="grid gap-4 sm:grid-cols-3">
-                            <Card className="border-primary/30 bg-primary/5"><CardContent className="p-4 text-center"><Zap className="h-6 w-6 text-primary mx-auto mb-1" /><p className="text-2xl font-bold">{totalChargingPoints}</p><p className="text-xs text-muted-foreground">Total Points</p></CardContent></Card>
-                            <Card className="border-emerald-400/30 bg-emerald-500/5"><CardContent className="p-4 text-center"><Clock className="h-6 w-6 text-emerald-600 mx-auto mb-1" /><p className="text-2xl font-bold">{availableNow}</p><p className="text-xs text-muted-foreground">Available Now</p></CardContent></Card>
-                            <Card className="border-amber-400/30 bg-amber-500/5"><CardContent className="p-4 text-center"><Timer className="h-6 w-6 text-amber-600 mx-auto mb-1" /><p className="text-2xl font-bold">{occupiedNow}</p><p className="text-xs text-muted-foreground">Occupied Now</p></CardContent></Card>
-                        </div>
+                <div className="grid gap-6 lg:grid-cols-3">
+                    <div className="space-y-6 lg:col-span-2">
+                        <Card className="border bg-white">
+                            <CardContent className="p-5">
+                                <div className="mb-4 flex items-center justify-between gap-3">
+                                    <p className="text-base font-semibold">Charging summary</p>
+                                    <Button
+                                        className="gap-2"
+                                        disabled={availableNow <= 0}
+                                        onClick={() => bookingSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                                    >
+                                        <CalendarCheck className="h-4 w-4" />
+                                        {availableNow > 0 ? "Book Slot" : "Fully Booked"}
+                                    </Button>
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                    <StatTile icon={<Zap className="h-4 w-4 text-primary" />} label="Total Points" value={`${totalChargingPoints}`} />
+                                    <StatTile icon={<Clock className="h-4 w-4 text-emerald-600" />} label="Available" value={`${availableNow}`} />
+                                    <StatTile icon={<Timer className="h-4 w-4 text-amber-600" />} label="Occupied" value={`${occupiedNow}`} />
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                        <Card ref={bookingSectionRef} id="booking-section" className="border-primary/20 shadow-sm">
-                            <CardHeader className="border-b border-border/60 bg-muted/20">
-                                <CardTitle className="text-xl">Book Slot</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid gap-4 sm:grid-cols-3">
-                                    <div className="space-y-2 sm:col-span-3">
+                        <div ref={bookingSectionRef} id="booking-section">
+                            <Card className="border bg-white">
+                                <CardContent className="space-y-5 p-5">
+                                    <div>
+                                        <p className="text-lg font-semibold">Book a charging slot</p>
+                                        <p className="text-sm text-muted-foreground">Choose an available slot or set date and time manually.</p>
+                                    </div>
+
+                                    <div className="space-y-2">
                                         <Label>Predefined Slot (optional)</Label>
                                         <Select value={selectedSlotId} onValueChange={setSelectedSlotId}>
                                             <SelectTrigger>
@@ -442,172 +472,225 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                                 })}
                                             </SelectContent>
                                         </Select>
-                                        <p className="text-xs text-muted-foreground">
-                                            Pick a predefined slot or continue with manual booking.
-                                        </p>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label>Date</Label>
-                                        <Input type="date" value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Start Time</Label>
-                                        <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Duration (hours)</Label>
-                                        <Input type="number" min="1" max="12" value={durationHours} onChange={(e) => setDurationHours(e.target.value)} />
-                                    </div>
-                                </div>
 
-                                {bookingSummary && (
-                                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
-                                        <p className="font-medium mb-1">Booking Summary</p>
-                                        <p>Date: {bookingSummary.start.toLocaleDateString()}</p>
-                                        <p>Start: {bookingSummary.start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
-                                        <p>End: {bookingSummary.end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
-                                        <p>Duration: {bookingSummary.hours} hour(s)</p>
-                                        <p className="font-semibold text-primary mt-1">Price: {formatLkr(station.pricePerKwh)}</p>
-                                    </div>
-                                )}
-
-                                <div className="rounded-xl border border-border bg-background p-4 text-sm">
-                                    <p className="font-medium mb-2">Availability</p>
-                                    {checkingAvailability ? (
-                                        <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Checking...</div>
-                                    ) : bookingAvailability ? (
-                                        <div className="space-y-1">
-                                            <p>Total Points: {bookingAvailability.totalChargingPoints}</p>
-                                            <p>Available: {bookingAvailability.availablePoints}</p>
-                                            <p>Occupied: {bookingAvailability.occupiedPoints}</p>
-                                            <p className={bookingAvailability.canBook ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                                                {bookingAvailability.canBook ? "Available" : "Fully Booked for selected time"}
-                                            </p>
+                                    <div className="grid gap-4 sm:grid-cols-3">
+                                        <div className="space-y-2">
+                                            <Label>Date</Label>
+                                            <Input type="date" value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} />
                                         </div>
-                                    ) : (
-                                        <p className="text-muted-foreground">Select date and time to check.</p>
-                                    )}
-                                </div>
-
-                                <Button
-                                    onClick={handleBook}
-                                    disabled={submittingBooking || !bookingAvailability || !bookingAvailability.canBook}
-                                    className="w-full h-11 text-base font-semibold"
-                                >
-                                    {submittingBooking ? "Processing..." : "Confirm & Pay"}
-                                </Button>
-
-                                {paymentStatus === "success" && (
-                                    <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
-                                        <p className="font-medium">Payment Successful</p>
-                                        <p>Your booking has been confirmed.</p>
+                                        <div className="space-y-2">
+                                            <Label>Start Time</Label>
+                                            <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Duration (hours)</Label>
+                                            <Input type="number" min="1" max="12" value={durationHours} onChange={(e) => setDurationHours(e.target.value)} />
+                                        </div>
                                     </div>
-                                )}
-                                {paymentStatus === "dismissed" && (
-                                    <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-700">
-                                        <p className="font-medium">Payment Cancelled</p>
-                                        <p>You closed the payment window.</p>
-                                    </div>
-                                )}
-                                {paymentStatus === "error" && (
-                                    <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-                                        <p className="font-medium">Payment Failed</p>
-                                        <p>Something went wrong. Please try again.</p>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
 
-                        <Card className="shadow-sm">
-                            <CardHeader><CardTitle>Reviews ({reviews.length})</CardTitle></CardHeader>
-                            <CardContent className="space-y-4">
-                                {isSignedIn && (
-                                    <form onSubmit={handleReview} className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
-                                        <div className="flex gap-3">
-                                            <div className="flex items-center gap-1 rounded-lg border border-input bg-background px-2">
-                                                {[1, 2, 3, 4, 5].map((rating) => (
-                                                    <button
-                                                        key={rating}
-                                                        type="button"
-                                                        onClick={() => setReviewRating(rating)}
-                                                        className="p-1"
-                                                        aria-label={`Rate ${rating} star${rating > 1 ? "s" : ""}`}
-                                                        title={`${rating} Star${rating > 1 ? "s" : ""}`}
-                                                    >
-                                                        <Star
-                                                            className={`h-5 w-5 ${
-                                                                rating <= reviewRating
-                                                                    ? "fill-yellow-500 text-yellow-500"
-                                                                    : "text-muted-foreground"
-                                                            }`}
-                                                        />
-                                                    </button>
-                                                ))}
+                                    {bookingSummary ? (
+                                        <div className="rounded-xl border bg-slate-50 p-4 text-sm">
+                                            <p className="mb-2 font-medium">Booking summary</p>
+                                            <div className="grid gap-1 sm:grid-cols-2">
+                                                <p>Date: {bookingSummary.start.toLocaleDateString()}</p>
+                                                <p>Duration: {bookingSummary.hours} hour(s)</p>
+                                                <p>Start: {bookingSummary.start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                                                <p>End: {bookingSummary.end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
                                             </div>
-                                            <Textarea placeholder="Write your review..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} className="flex-1" required />
+                                            <p className="mt-2 font-semibold text-foreground">Price: {formatLkr(station.pricePerKwh)}</p>
                                         </div>
+                                    ) : null}
+
+                                    <div className="rounded-xl border bg-background p-4 text-sm">
+                                        <p className="mb-2 font-medium">Availability check</p>
+                                        {checkingAvailability ? (
+                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                Checking availability...
+                                            </div>
+                                        ) : bookingAvailability ? (
+                                            <div className="space-y-1">
+                                                <p>Total Points: {bookingAvailability.totalChargingPoints}</p>
+                                                <p>Available: {bookingAvailability.availablePoints}</p>
+                                                <p>Occupied: {bookingAvailability.occupiedPoints}</p>
+                                                <p className={bookingAvailability.canBook ? "font-medium text-green-600" : "font-medium text-red-600"}>
+                                                    {bookingAvailability.canBook ? "Available for booking" : "Fully booked for selected time"}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <p className="text-muted-foreground">Select date and time to check availability.</p>
+                                        )}
+                                    </div>
+
+                                    <Button
+                                        onClick={handleBook}
+                                        disabled={submittingBooking || !bookingAvailability || !bookingAvailability.canBook}
+                                        className="h-11 w-full text-base font-semibold"
+                                    >
+                                        {submittingBooking ? "Processing..." : "Confirm & Pay"}
+                                    </Button>
+
+                                    {paymentStatus === "success" ? (
+                                        <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                                            <p className="font-medium">Payment successful</p>
+                                            <p>Your booking has been confirmed.</p>
+                                        </div>
+                                    ) : null}
+                                    {paymentStatus === "dismissed" ? (
+                                        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-700">
+                                            <p className="font-medium">Payment cancelled</p>
+                                            <p>You closed the payment window.</p>
+                                        </div>
+                                    ) : null}
+                                    {paymentStatus === "error" ? (
+                                        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                                            <p className="font-medium">Payment failed</p>
+                                            <p>Something went wrong. Please try again.</p>
+                                        </div>
+                                    ) : null}
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <Card className="border bg-white">
+                            <CardContent className="space-y-4 p-5">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-lg font-semibold">Reviews ({reviews.length})</p>
+                                </div>
+
+                                {isSignedIn ? (
+                                    <form onSubmit={handleReview} className="space-y-3 rounded-xl border bg-slate-50 p-4">
+                                        <div className="flex flex-wrap gap-2">
+                                            {[1, 2, 3, 4, 5].map((rating) => (
+                                                <button
+                                                    key={rating}
+                                                    type="button"
+                                                    onClick={() => setReviewRating(rating)}
+                                                    className="rounded-md border bg-white p-1.5"
+                                                    aria-label={`Rate ${rating} star${rating > 1 ? "s" : ""}`}
+                                                    title={`${rating} Star${rating > 1 ? "s" : ""}`}
+                                                >
+                                                    <Star
+                                                        className={`h-5 w-5 ${
+                                                            rating <= reviewRating
+                                                                ? "fill-yellow-500 text-yellow-500"
+                                                                : "text-muted-foreground"
+                                                        }`}
+                                                    />
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <Textarea
+                                            placeholder="Write your review..."
+                                            value={reviewComment}
+                                            onChange={(e) => setReviewComment(e.target.value)}
+                                            required
+                                        />
                                         <Button type="submit" size="sm">Submit Review</Button>
                                     </form>
-                                )}
-                                <Separator />
+                                ) : null}
+
                                 {reviews.length === 0 ? (
-                                    <p className="text-muted-foreground text-center py-4">No reviews yet.</p>
+                                    <p className="py-4 text-center text-muted-foreground">No reviews yet.</p>
                                 ) : (
-                                    reviews.map((r) => (
-                                        <div key={r._id} className="flex gap-3 p-3 rounded-lg">
-                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">
-                                                {r.userId?.name?.charAt(0) || "U"}
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="font-medium text-sm">{r.userId?.name || "User"}</span>
+                                    <div className="space-y-3">
+                                        {reviews.map((r) => (
+                                            <div key={r._id} className="rounded-xl border bg-background p-3">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-slate-50 text-xs font-bold">
+                                                            {r.userId?.name?.charAt(0) || "U"}
+                                                        </div>
+                                                        <span className="text-sm font-medium">{r.userId?.name || "User"}</span>
+                                                    </div>
                                                     <div className="flex items-center gap-1 text-sm">
-                                                        <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />{r.rating}
+                                                        <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
+                                                        {r.rating}
                                                     </div>
                                                 </div>
-                                                <p className="text-sm text-muted-foreground mt-1">{r.comment}</p>
-                                                <p className="text-xs text-muted-foreground mt-1">{new Date(r.createdAt).toLocaleDateString()}</p>
+                                                <p className="mt-2 text-sm text-muted-foreground">{r.comment}</p>
+                                                <p className="mt-1 text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleDateString()}</p>
                                             </div>
-                                        </div>
-                                    ))
+                                        ))}
+                                    </div>
                                 )}
                             </CardContent>
                         </Card>
                     </div>
 
                     <div className="space-y-6">
-                        <MapView
-                            stations={station ? [{
-                                _id: station._id,
-                                name: station.name,
-                                location: station.location,
-                            }] : []}
-                            center={{ lat: station.location.latitude, lng: station.location.longitude }}
-                            className="h-[250px] rounded-xl overflow-hidden border border-border shadow-sm"
-                        />
-                        <Card className="shadow-sm">
-                            <CardHeader><CardTitle className="text-base">Station Info</CardTitle></CardHeader>
-                            <CardContent className="space-y-3 text-sm">
-                                <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /><span>{station.city}</span></div>
-                                {station.address && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /><span>{station.address}</span></div>}
-                                <div className="flex items-center gap-2"><User className="h-4 w-4 text-primary" /><span>{station.ownerId?.name || "Owner"}</span></div>
-                                <div className="flex items-center gap-2"><Zap className="h-4 w-4 text-primary" /><span>{station.chargerType} Charger</span></div>
-                                <div className="text-sm text-muted-foreground">Price: {formatLkr(station.pricePerKwh)}</div>
-                                {station.description && (
-                                    <div className="rounded-lg bg-muted/30 p-3 text-sm text-muted-foreground">
+                        <Card className="overflow-hidden border bg-white">
+                            <div className="border-b px-4 py-3">
+                                <p className="text-sm font-medium">Location</p>
+                            </div>
+                            <CardContent className="p-0">
+                                <MapView
+                                    stations={station ? [{
+                                        _id: station._id,
+                                        name: station.name,
+                                        location: station.location,
+                                    }] : []}
+                                    center={{ lat: station.location.latitude, lng: station.location.longitude }}
+                                    className="h-[250px]"
+                                />
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border bg-white">
+                            <CardContent className="space-y-4 p-5">
+                                <p className="text-base font-semibold">Station info</p>
+                                <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label={station.city} />
+                                {station.address ? <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label={station.address} /> : null}
+                                <InfoRow icon={<User className="h-4 w-4 text-primary" />} label={station.ownerId?.name || "Owner"} />
+                                <InfoRow icon={<Zap className="h-4 w-4 text-primary" />} label={`${station.chargerType} Charger`} />
+                                <InfoRow icon={<ArrowRight className="h-4 w-4 text-primary" />} label={`Price: ${formatLkr(station.pricePerKwh)}`} />
+                                {station.description ? (
+                                    <div className="rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground">
                                         {station.description}
                                     </div>
-                                )}
-                                <Separator />
-                                <div className="p-3 rounded-lg bg-red-50 border border-red-200">
-                                    <div className="flex items-center gap-2 text-red-600 font-medium text-sm"><Phone className="h-4 w-4" /> Emergency Assistance</div>
-                                    <p className="text-xs text-muted-foreground mt-1">Call 1-800-EV-HELP for 24/7 support</p>
+                                ) : null}
+
+                                <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                                    <div className="flex items-center gap-2 text-sm font-medium text-red-700">
+                                        <Phone className="h-4 w-4" />
+                                        Emergency Assistance
+                                    </div>
+                                    <p className="mt-1 text-xs text-muted-foreground">Call 1-800-EV-HELP for 24/7 support.</p>
                                 </div>
                             </CardContent>
                         </Card>
                     </div>
                 </div>
             </div>
+        </div>
+    );
+}
+
+function HeaderMetric({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-xl border bg-slate-50 px-3 py-2">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
+        </div>
+    );
+}
+
+function StatTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+    return (
+        <div className="rounded-xl border bg-slate-50 p-3">
+            <div className="mb-1 flex items-center justify-center">{icon}</div>
+            <p className="text-center text-xl font-semibold">{value}</p>
+            <p className="text-center text-xs text-muted-foreground">{label}</p>
+        </div>
+    );
+}
+
+function InfoRow({ icon, label }: { icon: React.ReactNode; label: string }) {
+    return (
+        <div className="flex items-center gap-2 text-sm">
+            {icon}
+            <span>{label}</span>
         </div>
     );
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Station from "@/models/Station";
 import { getCurrentOccupancyMap } from "@/lib/booking-availability";
+import { optimizeRouteWithGemini } from "@/lib/ai-route-optimizer";
 
 type RoutePoint = { lat: number; lng: number };
 
@@ -27,6 +28,8 @@ interface RouteStation {
     distanceToRouteKm: number;
     distanceFromStartKm: number;
     progress: number;
+    estimatedWaitMinutes: number;
+    estimatedChargeCostLkr: number;
 }
 
 function getAvailabilityLabel(availableNow: number, totalChargingPoints: number) {
@@ -84,6 +87,15 @@ function getDistanceToRouteKm(point: RoutePoint, routePoints: RoutePoint[]) {
         if (distance < minDistance) minDistance = distance;
     }
     return minDistance;
+}
+
+function estimateWaitMinutes(totalChargingPoints: number, occupiedNow: number, availableNow: number) {
+    if (totalChargingPoints <= 0) return 45;
+    const utilization = Math.min(1, Math.max(0, occupiedNow / totalChargingPoints));
+
+    if (availableNow <= 0) return Math.round(25 + utilization * 35);
+    if (availableNow === 1) return Math.round(8 + utilization * 18);
+    return Math.round(2 + utilization * 10);
 }
 
 function getClosestPointIndex(point: RoutePoint, routePoints: RoutePoint[]) {
@@ -154,6 +166,8 @@ export async function POST(request: Request) {
                 const totalChargingPoints = station.totalChargingPoints || station.totalSlots || 0;
                 const occupiedNow = occupancyMap.get(String(station._id)) || 0;
                 const availableNow = Math.max(totalChargingPoints - occupiedNow, 0);
+                const estimatedWaitMinutes = estimateWaitMinutes(totalChargingPoints, occupiedNow, availableNow);
+                const typicalTopUpKwh = Math.max(12, Math.min(45, vehicleRangeKm * 0.12));
                 const point = {
                     lat: station.location.latitude,
                     lng: station.location.longitude,
@@ -177,6 +191,8 @@ export async function POST(request: Request) {
                     distanceToRouteKm,
                     distanceFromStartKm: progress * distanceKm,
                     progress,
+                    estimatedWaitMinutes,
+                    estimatedChargeCostLkr: Math.round(station.pricePerKwh * typicalTopUpKwh),
                 };
             })
             .filter((station) => station.distanceToRouteKm <= corridorKm)
@@ -200,9 +216,19 @@ export async function POST(request: Request) {
                     return segmentDistance <= safeRangeKm;
                 })
                 .sort((a, b) => {
+                    const scoreA =
+                        a.estimatedWaitMinutes * 0.48 +
+                        a.pricePerKwh * 0.32 +
+                        a.distanceToRouteKm * 0.14 -
+                        a.rating * 0.06;
+                    const scoreB =
+                        b.estimatedWaitMinutes * 0.48 +
+                        b.pricePerKwh * 0.32 +
+                        b.distanceToRouteKm * 0.14 -
+                        b.rating * 0.06;
+                    if (Math.abs(scoreA - scoreB) > 0.01) return scoreA - scoreB;
                     if (Math.abs(b.progress - a.progress) > 0.001) return b.progress - a.progress;
-                    if (b.availableNow !== a.availableNow) return b.availableNow - a.availableNow;
-                    return b.rating - a.rating;
+                    return b.availableNow - a.availableNow;
                 });
 
             const selected = reachableCandidates[0];
@@ -214,6 +240,19 @@ export async function POST(request: Request) {
         }
 
         const canReachDestination = distanceKm * (1 - currentProgress) <= safeRangeKm;
+        const aiOptimization = await optimizeRouteWithGemini({
+            routeDistanceKm: distanceKm,
+            routeDurationMinutes: durationMinutes,
+            planningRangeKm: safeRangeKm,
+            safeStops: plannedStops,
+            candidateStations: stationsOnRoute,
+        });
+
+        const stationById = new Map(stationsOnRoute.map((station) => [station._id, station]));
+        const aiRecommendedStops = aiOptimization.optimizedStopIds
+            .map((id) => stationById.get(id))
+            .filter((station): station is RouteStation => Boolean(station));
+        const finalRecommendedStops = aiRecommendedStops.length > 0 ? aiRecommendedStops : plannedStops;
 
         return NextResponse.json({
             route: {
@@ -230,7 +269,13 @@ export async function POST(request: Request) {
                     : "Could not guarantee destination reach with available stations on this route.",
             },
             stationsOnRoute: stationsOnRoute.slice(0, 40),
-            recommendedStops: plannedStops,
+            recommendedStops: finalRecommendedStops,
+            aiOptimization: {
+                provider: aiOptimization.provider,
+                enabled: aiOptimization.enabled,
+                summary: aiOptimization.summary,
+                scoreBreakdown: aiOptimization.scoreBreakdown,
+            },
         });
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Server error";

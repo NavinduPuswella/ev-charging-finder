@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Plus, MapPin, Loader2, Navigation } from "lucide-react";
+import { toast } from "sonner";
 
 interface Station { _id: string; name: string; city: string; chargerType: string; totalSlots: number; pricePerKwh: number; rating: number; isApproved: boolean; }
 
@@ -62,11 +63,12 @@ export default function OwnerStationsPage() {
         });
         const data = await res.json();
         if (!res.ok) {
-            alert(data.error || "Failed to create station");
+            toast.error(data.error || "Failed to create station");
             return;
         }
         setDialogOpen(false);
         setForm({ name: "", city: "", chargerType: "Type2", totalSlots: "", pricePerKwh: "", latitude: "", longitude: "" });
+        toast.success("Station submitted for approval");
         fetchStations();
     };
 

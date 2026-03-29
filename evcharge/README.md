@@ -20,6 +20,16 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Environment Notes
+
+To enable Google Gemini-powered route optimization in the trip planner API, set:
+
+```bash
+GEMINI_API_KEY=your_google_gemini_api_key
+```
+
+If this key is not present, the API automatically falls back to an internal heuristic optimizer.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
