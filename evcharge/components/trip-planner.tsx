@@ -184,15 +184,23 @@ export default function TripPlanner() {
 
     return (
         <div className="min-h-screen bg-slate-50">
-            <section className="border-b bg-white">
-                <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-10 pt-28 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
+            <section
+                className="relative overflow-hidden border-b bg-slate-900"
+                style={{
+                    backgroundImage: "url('https://energysense.uillinois.edu/wp-content/uploads/2022/03/EV-charging-2.png')",
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                }}
+            >
+                <div className="absolute inset-0 bg-slate-900/65" />
+                <div className="relative mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-10 pt-28 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
                     <div>
-                        <Badge variant="outline" className="mb-4">
+                        <Badge variant="outline" className="mb-4 border-white/40 bg-white/10 text-white">
                             <Route className="mr-1 h-3.5 w-3.5" />
                             Trip Planner
                         </Badge>
-                        <h1 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl">Plan your EV journey with confidence</h1>
-                        <p className="mt-4 max-w-2xl text-sm text-muted-foreground sm:text-base">
+                        <h1 className="max-w-3xl text-3xl font-semibold tracking-tight text-white sm:text-5xl">Plan your EV journey with confidence</h1>
+                        <p className="mt-4 max-w-2xl text-sm text-white/85 sm:text-base">
                             Enter your route and charging preferences to find stations that fit your trip, budget, and timing.
                         </p>
                     </div>

@@ -23,13 +23,13 @@ const CONTACT_INFO = [
   {
     icon: Phone,
     title: "Phone",
-    detail: "078-1888-084",
+    detail: "078-188-8084",
     sub: "Mon-Fri, 9am-6pm",
   },
   {
     icon: Mail,
     title: "Email",
-    detail: "support@evcharge.com",
+    detail: "navindupuswella@gmail.com",
     sub: "We reply within 24h",
   },
   {
@@ -42,7 +42,7 @@ const CONTACT_INFO = [
     icon: Clock,
     title: "Working Hours",
     detail: "Mon - Sat",
-    sub: "9:00 AM - 6:00 PM",
+    sub: "9:00 AM - 5:00 PM",
   },
 ];
 
@@ -51,13 +51,13 @@ const CONTACT_CHANNELS = [
     icon: Headphones,
     title: "24/7 EV Assistance",
     desc: "Stranded or need urgent help? Call our emergency hotline anytime.",
-    action: "078-1888-084-EV-HELP",
+    action: "078-188-8084-EV-HELP",
   },
   {
     icon: MessageSquare,
     title: "Live Chat",
     desc: "Chat with our support team in real-time during business hours.",
-    action: "Available Mon-Sat, 9am-6pm",
+    action: "Available Mon-Sat, 9am-5pm",
   },
   {
     icon: Building,
@@ -74,11 +74,56 @@ export default function ContactPage() {
     subject: "",
     message: "",
   });
+  const [errors, setErrors] = useState({
+    name: "",
+    email: "",
+    subject: "",
+    message: "",
+  });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const validateForm = () => {
+    const nextErrors = {
+      name: "",
+      email: "",
+      subject: "",
+      message: "",
+    };
+
+    if (formData.name.trim().length < 2) {
+      nextErrors.name = "Please enter at least 2 characters for your name.";
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(formData.email.trim())) {
+      nextErrors.email = "Please enter a valid email address.";
+    }
+
+    if (formData.subject.trim().length < 4) {
+      nextErrors.subject = "Subject should be at least 4 characters.";
+    }
+
+    if (formData.message.trim().length < 10) {
+      nextErrors.message = "Message should be at least 10 characters.";
+    }
+
+    setErrors(nextErrors);
+    return Object.values(nextErrors).every((value) => value === "");
+  };
+
+  const handleFieldChange = (field: "name" | "email" | "subject" | "message", value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateForm()) {
+      toast.error("Please fix the form errors before submitting.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -99,6 +144,7 @@ export default function ContactPage() {
       setTimeout(() => {
         setSubmitted(false);
         setFormData({ name: "", email: "", subject: "", message: "" });
+        setErrors({ name: "", email: "", subject: "", message: "" });
       }, 3000);
     } catch {
       toast.error("Failed to send message");
@@ -110,7 +156,14 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <section className="relative overflow-hidden border-b bg-slate-950 text-white">
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/50 via-slate-950/70 to-slate-950/95" />
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage:
+              "url('https://futureenergy.com/wp-content/uploads/2021/06/BlogHeader-4-copy.png')",
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/55 via-slate-950/70 to-slate-950/95" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 pb-10 pt-28 sm:px-6 lg:px-8">
           <span className="mb-4 inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm font-medium text-white">
             Contact
@@ -151,7 +204,7 @@ export default function ContactPage() {
       <section className="py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-6 lg:grid-cols-5">
-            <Card className="border bg-white shadow-none lg:col-span-3">
+            <Card className="border-0 bg-[#eaf0f6] shadow-[14px_14px_30px_#d0d6de,-14px_-14px_30px_#ffffff] lg:col-span-3">
               <CardContent className="p-6 sm:p-8">
                 <p className="mb-2 text-sm font-semibold text-primary">Contact Form</p>
                 <h2 className="mb-6 text-2xl font-semibold tracking-tight text-foreground">
@@ -172,45 +225,62 @@ export default function ContactPage() {
                   <form onSubmit={handleSubmit} className="space-y-5">
                     <div className="grid gap-5 sm:grid-cols-2">
                       <div>
-                        <label className="mb-1.5 block text-sm font-medium">Name</label>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">Name</label>
                         <Input
                           placeholder="Your name"
                           value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          required
+                          onChange={(e) => handleFieldChange("name", e.target.value)}
+                          className={`border-0 bg-[#eaf0f6] shadow-[inset_5px_5px_10px_#d0d6de,inset_-5px_-5px_10px_#ffffff] focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                            errors.name ? "ring-2 ring-red-400" : ""
+                          }`}
                         />
+                        {errors.name ? <p className="mt-1 text-xs text-red-600">{errors.name}</p> : null}
                       </div>
                       <div>
-                        <label className="mb-1.5 block text-sm font-medium">Email</label>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">Email</label>
                         <Input
                           type="email"
                           placeholder="your@email.com"
                           value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          required
+                          onChange={(e) => handleFieldChange("email", e.target.value)}
+                          className={`border-0 bg-[#eaf0f6] shadow-[inset_5px_5px_10px_#d0d6de,inset_-5px_-5px_10px_#ffffff] focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                            errors.email ? "ring-2 ring-red-400" : ""
+                          }`}
                         />
+                        {errors.email ? <p className="mt-1 text-xs text-red-600">{errors.email}</p> : null}
                       </div>
                     </div>
                     <div>
-                      <label className="mb-1.5 block text-sm font-medium">Subject</label>
+                      <label className="mb-1.5 block text-sm font-medium text-slate-700">Subject</label>
                       <Input
                         placeholder="How can we help?"
                         value={formData.subject}
-                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                        required
+                        onChange={(e) => handleFieldChange("subject", e.target.value)}
+                        className={`border-0 bg-[#eaf0f6] shadow-[inset_5px_5px_10px_#d0d6de,inset_-5px_-5px_10px_#ffffff] focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                          errors.subject ? "ring-2 ring-red-400" : ""
+                        }`}
                       />
+                      {errors.subject ? <p className="mt-1 text-xs text-red-600">{errors.subject}</p> : null}
                     </div>
                     <div>
-                      <label className="mb-1.5 block text-sm font-medium">Message</label>
+                      <label className="mb-1.5 block text-sm font-medium text-slate-700">Message</label>
                       <Textarea
                         placeholder="Tell us more about your inquiry..."
                         rows={5}
                         value={formData.message}
-                        onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                        required
+                        onChange={(e) => handleFieldChange("message", e.target.value)}
+                        className={`border-0 bg-[#eaf0f6] shadow-[inset_5px_5px_10px_#d0d6de,inset_-5px_-5px_10px_#ffffff] focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                          errors.message ? "ring-2 ring-red-400" : ""
+                        }`}
                       />
+                      {errors.message ? <p className="mt-1 text-xs text-red-600">{errors.message}</p> : null}
                     </div>
-                    <Button type="submit" size="lg" className="w-full gap-2 text-base" disabled={submitting}>
+                    <Button
+                      type="submit"
+                      size="lg"
+                      className="w-full gap-2 border-0 bg-[#eaf0f6] text-slate-700 shadow-[8px_8px_18px_#d0d6de,-8px_-8px_18px_#ffffff] transition-all hover:translate-y-0.5 hover:shadow-[inset_3px_3px_8px_#d0d6de,inset_-3px_-3px_8px_#ffffff] text-base"
+                      disabled={submitting}
+                    >
                       <Send className="h-4 w-4" />
                       {submitting ? "Sending..." : "Send Message"}
                     </Button>
