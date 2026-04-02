@@ -187,7 +187,7 @@ export default function TripPlanner() {
             <section
                 className="relative overflow-hidden border-b bg-slate-900"
                 style={{
-                    backgroundImage: "url('https://energysense.uillinois.edu/wp-content/uploads/2022/03/EV-charging-2.png')",
+                    backgroundImage: "url('https://qmerit.com/wp-content/uploads/2023/02/EI-SecHeader-evcharging-3jpg-scaled-1.jpeg')",
                     backgroundSize: "cover",
                     backgroundPosition: "center",
                 }}

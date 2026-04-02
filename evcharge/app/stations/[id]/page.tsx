@@ -656,7 +656,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                         <Phone className="h-4 w-4" />
                                         Emergency Assistance
                                     </div>
-                                    <p className="mt-1 text-xs text-muted-foreground">Call 1-800-EV-HELP for 24/7 support.</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">Call 078 188 8084-EV-HELP for 24/7 support.</p>
                                 </div>
                             </CardContent>
                         </Card>

@@ -201,28 +201,38 @@ export default function StationsPage() {
     ]);
 
     return (
-        <div className="min-h-screen bg-slate-50">
-            <section className="border-b bg-white">
-                <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-10 pt-28 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
-                    <div>
-                        <Badge variant="outline" className="mb-4">
+        <div className="min-h-screen bg-slate-50/60">
+            <section className="relative overflow-hidden border-b border-emerald-100/70 bg-gradient-to-br from-white via-white to-emerald-50/40">
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_45%_at_80%_-20%,rgba(16,185,129,0.1),transparent)]" />
+                <div className="relative mx-auto flex max-w-7xl flex-col gap-6 px-4 pb-7 pt-16 sm:px-6 sm:pb-8 sm:pt-20 lg:flex-row lg:items-center lg:justify-between lg:gap-10 lg:px-8">
+                    <div className="flex-1">
+                        <Badge variant="outline" className="mb-3 border-emerald-200 bg-emerald-50/70 text-emerald-700">
                             <BatteryCharging className="mr-1 h-3.5 w-3.5" />
                             EV Charging Network
                         </Badge>
-                        <h1 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl">Find charging stations that fit your route</h1>
-                        <p className="mt-4 max-w-2xl text-sm text-muted-foreground sm:text-base">
+                        <h1 className="max-w-2xl text-2xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                            Find charging stations that fit your route
+                        </h1>
+                        <p className="mt-3 max-w-xl text-sm text-slate-600 sm:text-base">
                             Search by city or station, then refine results by connector, availability, and proximity.
                         </p>
+                        <div className="mt-5 grid w-full max-w-md grid-cols-3 gap-2.5">
+                            <HeaderMetric label="Stations" value={`${allStations.length}`} />
+                            <HeaderMetric label="Cities" value={`${cities.length - 1}`} />
+                            <HeaderMetric label="Connectors" value={`${CHARGER_OPTIONS.length}`} />
+                        </div>
                     </div>
-                    <div className="grid w-full max-w-md grid-cols-3 gap-3">
-                        <HeaderMetric label="Stations" value={`${allStations.length}`} />
-                        <HeaderMetric label="Cities" value={`${cities.length - 1}`} />
-                        <HeaderMetric label="Connectors" value={`${CHARGER_OPTIONS.length}`} />
+                    <div className="hidden flex-shrink-0 xl:block">
+                        <img
+                            src="https://static.vecteezy.com/system/resources/previews/071/286/037/non_2x/electric-car-charging-illustration-city-view-vector.jpg"
+                            alt="Electric car charging illustration"
+                            className="h-auto w-[360px] rounded-2xl border border-emerald-100 bg-white/90 object-cover shadow-[0_20px_60px_-34px_rgba(15,23,42,0.45)]"
+                        />
                     </div>
                 </div>
             </section>
 
-            <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
                 <CardBlock>
                     <div className="flex flex-col gap-3 sm:flex-row">
                         <div className="relative flex-1">
@@ -231,7 +241,7 @@ export default function StationsPage() {
                                 placeholder="Search station name, city, or address..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="h-12 pl-11 text-base"
+                                className="h-11 rounded-xl border-slate-200 bg-white pl-11 text-[15px] shadow-sm placeholder:text-slate-400"
                             />
                             {searchQuery && (
                                 <button
@@ -245,7 +255,7 @@ export default function StationsPage() {
                         </div>
                         <Button
                             variant={showFilters ? "default" : "outline"}
-                            className="relative h-12 gap-2 px-5"
+                            className="relative h-11 gap-2 rounded-xl border-slate-200 px-5 shadow-sm"
                             onClick={() => setShowFilters(!showFilters)}
                         >
                             <SlidersHorizontal className="h-4 w-4" />
@@ -259,14 +269,14 @@ export default function StationsPage() {
                     </div>
 
                     <div className={`overflow-hidden transition-all duration-300 ${showFilters ? "mt-5 max-h-[680px] opacity-100" : "mt-0 max-h-0 opacity-0"}`}>
-                        <div className="rounded-xl border bg-slate-50 p-4 sm:p-5">
+                        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
                             <div className="mb-4 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Filter className="h-4 w-4 text-primary" />
-                                    <span className="text-sm font-semibold">Filter stations</span>
+                                    <Filter className="h-4 w-4 text-emerald-600" />
+                                    <span className="text-sm font-semibold text-slate-900">Filter stations</span>
                                 </div>
                                 {activeFilterCount > 0 && (
-                                    <button type="button" onClick={clearFilters} className="text-xs font-medium text-primary">
+                                    <button type="button" onClick={clearFilters} className="text-xs font-medium text-emerald-700 hover:text-emerald-800">
                                         Clear all
                                     </button>
                                 )}
@@ -275,7 +285,7 @@ export default function StationsPage() {
                             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                 <FilterField label="City">
                                     <Select value={selectedCity} onValueChange={setSelectedCity}>
-                                        <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                        <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white shadow-sm"><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             {cities.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                                         </SelectContent>
@@ -288,7 +298,7 @@ export default function StationsPage() {
                                         min={1}
                                         value={radiusKm}
                                         onChange={(e) => setRadiusKm(e.target.value)}
-                                        className="h-10"
+                                        className="h-10 rounded-xl border-slate-200 bg-white shadow-sm"
                                     />
                                 </FilterField>
 
@@ -296,7 +306,7 @@ export default function StationsPage() {
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        className="h-10 w-full gap-2"
+                                        className="h-10 w-full gap-2 rounded-xl border-slate-200 bg-white shadow-sm"
                                         onClick={useCurrentLocation}
                                         disabled={locating}
                                     >
@@ -307,7 +317,7 @@ export default function StationsPage() {
                             </div>
 
                             <div className="mt-4">
-                                <p className="mb-2 text-xs font-medium text-muted-foreground">Connector type</p>
+                                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Connector type</p>
                                 <div className="flex flex-wrap gap-2">
                                     {CHARGER_OPTIONS.map((c) => {
                                         const active = selectedChargers.includes(c);
@@ -316,7 +326,7 @@ export default function StationsPage() {
                                                 key={c}
                                                 type="button"
                                                 onClick={() => toggleCharger(c)}
-                                                className={`inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-1.5 text-xs font-semibold transition-colors ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-white text-foreground"}`}
+                                                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${active ? "border-emerald-600 bg-emerald-600 text-white shadow-sm" : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"}`}
                                             >
                                                 <Zap className="h-3 w-3" />
                                                 {c}
@@ -356,12 +366,12 @@ export default function StationsPage() {
                 </CardBlock>
 
                 {!loading && (
-                    <div className="mb-6 mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm text-muted-foreground">
+                    <div className="mb-5 mt-5 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-slate-600">
                             Showing <span className="font-semibold text-foreground">{stations.length}</span> station{stations.length !== 1 ? "s" : ""}
-                            {activeFilterCount > 0 ? <span className="text-primary"> · {activeFilterCount} active filter{activeFilterCount !== 1 ? "s" : ""}</span> : null}
+                            {activeFilterCount > 0 ? <span className="text-emerald-700"> · {activeFilterCount} active filter{activeFilterCount !== 1 ? "s" : ""}</span> : null}
                         </p>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
                             <Clock className="h-3.5 w-3.5" />
                             <span>Last updated just now</span>
                         </div>
@@ -387,7 +397,7 @@ export default function StationsPage() {
                         </Button>
                     </div>
                 ) : (
-                    <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         {stations.map((station, index) => (
                             <StationCard
                                 key={station.station._id}
@@ -405,21 +415,21 @@ export default function StationsPage() {
 
 function HeaderMetric({ label, value }: { label: string; value: string }) {
     return (
-        <div className="rounded-xl border bg-slate-50 px-3 py-2">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-            <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
+        <div className="rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm">
+            <p className="text-[11px] uppercase tracking-wide text-slate-500">{label}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{value}</p>
         </div>
     );
 }
 
 function CardBlock({ children }: { children: React.ReactNode }) {
-    return <div className="rounded-2xl border bg-white p-4 sm:p-5">{children}</div>;
+    return <div className="sticky top-3 z-20 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-[0_14px_36px_-28px_rgba(15,23,42,0.55)] backdrop-blur sm:top-4 sm:p-5">{children}</div>;
 }
 
 function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</label>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">{label}</label>
             {children}
         </div>
     );
@@ -437,7 +447,7 @@ function FilterToggle({
     disabled?: boolean;
 }) {
     return (
-        <label className={`inline-flex items-center gap-2.5 rounded-lg border bg-white p-2.5 ${disabled ? "opacity-60" : ""}`}>
+        <label className={`inline-flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50/60 p-2.5 ${disabled ? "opacity-60" : ""}`}>
             <div className="relative">
                 <input
                     type="checkbox"
@@ -446,10 +456,10 @@ function FilterToggle({
                     disabled={disabled}
                     className="peer sr-only"
                 />
-                <div className="h-5 w-9 rounded-full bg-muted transition-colors peer-checked:bg-primary" />
+                <div className="h-5 w-9 rounded-full bg-slate-300 transition-colors peer-checked:bg-emerald-600" />
                 <div className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-4" />
             </div>
-            <span className="text-xs font-medium text-foreground">{label}</span>
+            <span className="text-xs font-medium text-slate-700">{label}</span>
         </label>
     );
 }
@@ -470,55 +480,53 @@ function StationCard({
     const availPercent = (available / total) * 100;
     const statusLabel =
         station.availabilityStatus || (hasAvailable ? "Available" : "Fully Booked");
+    const statusTone =
+        statusLabel === "Available"
+            ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+            : statusLabel === "Limited Availability"
+                ? "text-amber-700 bg-amber-50 border-amber-200"
+                : "text-rose-700 bg-rose-50 border-rose-200";
 
     return (
         <div
-            className="animate-fade-in overflow-hidden rounded-xl border border-border bg-white transition-colors hover:border-primary/50"
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_45px_-32px_rgba(15,23,42,0.45)]"
             style={{ animationDelay: `${index * 60}ms` }}
         >
-            <div className="p-5">
+            <div className="p-4 sm:p-5">
                 <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-base font-semibold">{station.name}</h3>
-                        <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <h3 className="truncate text-base font-semibold text-slate-900">{station.name}</h3>
+                        <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
                             <MapPin className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate">{station.city}</span>
+                            <span className="truncate">{station.address || station.city}</span>
                             {distanceKm !== null ? (
                                 <>
-                                    <ArrowRight className="h-3 w-3" />
-                                    <span className="whitespace-nowrap text-foreground">{distanceKm.toFixed(1)} km</span>
+                                    <ArrowRight className="h-3 w-3 text-slate-400" />
+                                    <span className="whitespace-nowrap font-medium text-slate-700">{distanceKm.toFixed(1)} km</span>
                                 </>
                             ) : null}
                         </div>
                     </div>
-                    <Badge
-                        variant={
-                            statusLabel === "Available"
-                                ? "success"
-                                : statusLabel === "Limited Availability"
-                                    ? "warning"
-                                    : "destructive"
-                        }
-                        className="shrink-0"
-                    >
+                    <Badge className={`shrink-0 border ${statusTone}`}>
+                        <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${hasAvailable ? "bg-emerald-500" : "bg-rose-500"}`} />
                         {statusLabel}
                     </Badge>
                 </div>
 
-                <div className="mb-4 flex flex-wrap gap-1.5">
-                    <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                <div className="mb-4 flex flex-wrap gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
                         <Zap className="h-2.5 w-2.5" />
                         {station.chargerType}
                     </span>
                     {distanceKm !== null ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700">
                             <LocateFixed className="h-2.5 w-2.5" />
                             Nearby
                         </span>
                     ) : null}
                 </div>
 
-                <div className="mb-4 grid grid-cols-3 gap-2.5">
+                <div className="mb-4 grid grid-cols-3 gap-2">
                     <StationMetricCell
                         label="Rating"
                         value={station.rating?.toFixed(1) || "—"}
@@ -536,20 +544,20 @@ function StationCard({
                     />
                 </div>
 
-                <div className="mb-4 rounded-lg border bg-muted/30 p-3">
+                <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3.5">
                     <div className="mb-2 flex items-center justify-between">
-                        <span className="text-xs font-semibold text-foreground">Availability</span>
-                        <span className={`text-xs font-bold ${hasAvailable ? "text-green-600" : "text-red-600"}`}>
+                        <span className="text-xs font-semibold text-slate-700">Availability</span>
+                        <span className={`text-xs font-bold ${hasAvailable ? "text-emerald-700" : "text-rose-700"}`}>
                             {available} available
                         </span>
                     </div>
-                    <div className="mb-2 h-2 overflow-hidden rounded-full bg-muted">
+                    <div className="mb-2 h-2 overflow-hidden rounded-full bg-slate-200">
                         <div
-                            className={`h-full rounded-full transition-all duration-500 ${hasAvailable ? "bg-primary" : "bg-orange-400"}`}
+                            className={`h-full rounded-full transition-all ${hasAvailable ? "bg-emerald-600" : "bg-amber-500"}`}
                             style={{ width: `${availPercent}%` }}
                         />
                     </div>
-                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <div className="flex items-center gap-3 text-[11px] text-slate-500">
                         <span>{available} available</span>
                         <span>{booked} occupied</span>
                     </div>
@@ -557,13 +565,13 @@ function StationCard({
 
                 <div className="flex gap-2">
                     <Link href={`/stations/${station._id}`} className="flex-1">
-                        <Button variant="outline" className="h-10 w-full gap-1.5 text-sm">
+                        <Button variant="outline" className="h-10 w-full gap-1.5 rounded-xl border-slate-200 bg-white text-sm shadow-sm">
                             <Star className="h-4 w-4" />
                             View Details
                         </Button>
                     </Link>
                     <Link href={`/stations/${station._id}?book=true#booking-section`} className="flex-1">
-                        <Button className="h-10 w-full gap-1.5 text-sm" disabled={!hasAvailable}>
+                        <Button className="h-10 w-full gap-1.5 rounded-xl bg-emerald-600 text-sm hover:bg-emerald-700" disabled={!hasAvailable}>
                             <CalendarCheck className="h-4 w-4" />
                             {hasAvailable ? "Book Slot" : "Unavailable"}
                         </Button>
@@ -584,10 +592,10 @@ function StationMetricCell({
     icon: React.ReactNode;
 }) {
     return (
-        <div className="rounded-lg border bg-background p-2.5 text-center">
+        <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-center shadow-[0_8px_20px_-18px_rgba(15,23,42,0.7)]">
             <div className="mb-0.5 flex items-center justify-center">{icon}</div>
-            <div className="text-sm font-bold">{value}</div>
-            <div className="text-[10px] text-muted-foreground">{label}</div>
+            <div className="text-sm font-bold text-slate-900">{value}</div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
         </div>
     );
 }
