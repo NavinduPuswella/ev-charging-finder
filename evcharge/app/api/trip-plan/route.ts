@@ -162,7 +162,7 @@ export async function POST(request: Request) {
         await dbConnect();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const filter: any = { isApproved: true };
-        if (chargerType) filter.chargerType = chargerType;
+        if (chargerType) filter.chargerType = { $regex: chargerType, $options: "i" };
 
         const stations = await Station.find(filter);
         const occupancyMap = await getCurrentOccupancyMap(stations.map((s) => String(s._id)));

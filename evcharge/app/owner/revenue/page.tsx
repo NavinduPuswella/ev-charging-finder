@@ -31,8 +31,7 @@ export default function RevenuePage() {
 
     if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
-    const paid = bookings.filter((b) => b.status !== "CANCELLED");
-    const total = paid.reduce((s, b) => s + b.amount, 0);
+    const total = bookings.reduce((s, b) => s + b.amount, 0);
     const completed = bookings.filter((b) => b.status === "COMPLETED");
 
     return (
@@ -42,16 +41,16 @@ export default function RevenuePage() {
             <div className="grid gap-4 md:grid-cols-3">
                 <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Total Revenue</p><p className="text-3xl font-bold text-primary">${total}</p></div><DollarSign className="h-8 w-8 text-primary" /></div></CardContent></Card>
                 <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Completed</p><p className="text-3xl font-bold">{completed.length}</p></div><CalendarCheck className="h-8 w-8 text-green-500" /></div></CardContent></Card>
-                <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Avg Revenue</p><p className="text-3xl font-bold">${paid.length > 0 ? Math.round(total / paid.length) : 0}</p></div><TrendingUp className="h-8 w-8 text-blue-500" /></div></CardContent></Card>
+                <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Avg Revenue</p><p className="text-3xl font-bold">${bookings.length > 0 ? Math.round(total / bookings.length) : 0}</p></div><TrendingUp className="h-8 w-8 text-blue-500" /></div></CardContent></Card>
             </div>
 
             <div>
                 <h2 className="text-xl font-semibold mb-4">Transaction History</h2>
-                {paid.length === 0 ? (
+                {bookings.length === 0 ? (
                     <Card><CardContent className="p-8 text-center text-muted-foreground">No transactions yet.</CardContent></Card>
                 ) : (
                     <div className="space-y-2">
-                        {paid.map((b) => (
+                        {bookings.map((b) => (
                             <Card key={b._id}>
                                 <CardContent className="p-4 flex items-center justify-between">
                                     <div>

@@ -410,10 +410,12 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                 <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
                                 {station.rating.toFixed(1)}
                             </span>
-                            <Badge variant="secondary">
-                                <Zap className="mr-1 h-3 w-3" />
-                                {station.chargerType}
-                            </Badge>
+                            {station.chargerType.split(",").map((t) => t.trim()).filter(Boolean).map((type) => (
+                                <Badge key={type} variant="secondary">
+                                    <Zap className="mr-1 h-3 w-3" />
+                                    {type}
+                                </Badge>
+                            ))}
                             <Badge variant={getAvailabilityBadge(station.availabilityStatus)}>
                                 {station.availabilityStatus}
                             </Badge>
@@ -658,7 +660,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                 <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label={station.city} />
                                 {station.address ? <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label={station.address} /> : null}
                                 <InfoRow icon={<User className="h-4 w-4 text-primary" />} label={station.ownerId?.name || "Owner"} />
-                                <InfoRow icon={<Zap className="h-4 w-4 text-primary" />} label={`${station.chargerType} Charger`} />
+                                <InfoRow icon={<Zap className="h-4 w-4 text-primary" />} label={`${station.chargerType.split(",").map((t) => t.trim()).filter(Boolean).join(", ")} Charger`} />
                                 <InfoRow icon={<ArrowRight className="h-4 w-4 text-primary" />} label={`Price: ${formatLkr(station.pricePerKwh)}`} />
                                 {station.description ? (
                                     <div className="rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground">

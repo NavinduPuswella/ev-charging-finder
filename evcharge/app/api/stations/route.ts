@@ -4,6 +4,19 @@ import Station from "@/models/Station";
 import { getAuthUser } from "@/lib/auth";
 import { getCurrentOccupancyMap } from "@/lib/booking-availability";
 
+function normalizeChargerTypes(value: unknown) {
+    if (Array.isArray(value)) {
+        return value.filter((type): type is string => typeof type === "string" && type.trim().length > 0);
+    }
+    if (typeof value === "string" && value.trim().length > 0) {
+        return value
+            .split(",")
+            .map((type) => type.trim())
+            .filter(Boolean);
+    }
+    return [];
+}
+
 function getAvailabilityLabel(
     availableNow: number,
     totalChargingPoints: number,
@@ -36,7 +49,7 @@ export async function GET(request: Request) {
         const filter: any = all ? {} : { isApproved: true };
 
         if (city) filter.city = new RegExp(city, "i");
-        if (chargerType) filter.chargerType = chargerType;
+        if (chargerType) filter.chargerType = { $regex: chargerType, $options: "i" };
 
         let stations = await Station.find(filter).populate("ownerId", "name email");
 
@@ -128,12 +141,19 @@ export async function POST(request: Request) {
         }
 
         const isAdmin = user.role === "ADMIN";
+        const chargerTypes = normalizeChargerTypes(body.chargerType);
+        if (chargerTypes.length === 0) {
+            return NextResponse.json(
+                { error: "At least one charger type is required." },
+                { status: 400 }
+            );
+        }
 
         const station = await Station.create({
             name: body.name,
             city: body.city,
             address: body.address,
-            chargerType: body.chargerType,
+            chargerType: chargerTypes.join(", "),
             pricePerKwh: Number(body.pricePerKwh),
             totalChargingPoints,
             totalSlots: totalChargingPoints,

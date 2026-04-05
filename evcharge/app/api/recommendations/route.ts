@@ -21,7 +21,7 @@ export async function POST(request: Request) {
             isApproved: true,
             status: { $nin: ["INACTIVE", "MAINTENANCE"] },
         };
-        if (chargerType) filter.chargerType = chargerType;
+        if (chargerType) filter.chargerType = { $regex: chargerType, $options: "i" };
 
         const stations = await Station.find(filter);
         const occupancyMap = await getCurrentOccupancyMap(

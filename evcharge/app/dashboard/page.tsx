@@ -99,7 +99,6 @@ export default function DashboardPage() {
         const completed = bookings.filter((b) => b.status === "COMPLETED").length;
         const cancelled = bookings.filter((b) => b.status === "CANCELLED").length;
         const totalSpent = bookings
-            .filter((b) => b.status !== "CANCELLED")
             .reduce((sum, b) => sum + b.amount, 0);
         return { confirmed, completed, cancelled, totalSpent };
     }, [bookings]);
@@ -113,7 +112,7 @@ export default function DashboardPage() {
             });
             setBookings((prev) =>
                 prev.map((b) =>
-                    b._id === id ? { ...b, status: "CANCELLED", paymentStatus: "REFUNDED" } : b
+                    b._id === id ? { ...b, status: "CANCELLED" } : b
                 )
             );
         } catch (err) {
@@ -207,7 +206,7 @@ export default function DashboardPage() {
                     icon={CreditCard}
                     label="Total Spent"
                     value={`LKR ${stats.totalSpent.toLocaleString()}`}
-                    sub={`across ${bookings.length - stats.cancelled} sessions`}
+                    sub={`across ${bookings.length} sessions`}
                     isText
                 />
             </div>

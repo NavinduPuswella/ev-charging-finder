@@ -171,7 +171,10 @@ export default function StationsPage() {
         }
 
         if (selectedChargers.length > 0) {
-            list = list.filter(({ station: s }) => selectedChargers.includes(s.chargerType));
+            list = list.filter(({ station: s }) => {
+                const stationTypes = s.chargerType.split(",").map((t) => t.trim()).filter(Boolean);
+                return selectedChargers.some((c) => stationTypes.includes(c));
+            });
         }
 
         if (onlyAvailable) {
@@ -523,10 +526,12 @@ function StationCard({
                 </div>
 
                 <div className="mb-4 flex flex-wrap gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                        <Zap className="h-2.5 w-2.5" />
-                        {station.chargerType}
-                    </span>
+                    {station.chargerType.split(",").map((t) => t.trim()).filter(Boolean).map((type) => (
+                        <span key={type} className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                            <Zap className="h-2.5 w-2.5" />
+                            {type}
+                        </span>
+                    ))}
                     {distanceKm !== null ? (
                         <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700">
                             <LocateFixed className="h-2.5 w-2.5" />

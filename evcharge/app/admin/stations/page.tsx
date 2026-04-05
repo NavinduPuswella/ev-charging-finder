@@ -25,7 +25,7 @@ interface Station {
     name: string;
     city: string;
     address?: string;
-    chargerType: string;
+    chargerType: string | string[];
     totalSlots: number;
     totalChargingPoints?: number;
     pricePerKwh: number;
@@ -36,8 +36,24 @@ interface Station {
     location: { latitude: number; longitude: number };
 }
 
+const CHARGER_TYPES = ["Type1", "Type2", "CCS", "CHAdeMO", "Tesla"] as const;
+
+const normalizeChargerTypes = (value: string | string[] | undefined) => {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (typeof value !== "string" || !value.trim()) return [];
+    return value
+        .split(",")
+        .map((type) => type.trim())
+        .filter(Boolean);
+};
+
+const formatChargerTypes = (value: string | string[]) => {
+    const types = normalizeChargerTypes(value);
+    return types.length > 0 ? types : ["-"];
+};
+
 const emptyForm = {
-    name: "", city: "", address: "", chargerType: "Type2", totalSlots: "", pricePerKwh: "",
+    name: "", city: "", address: "", chargerType: ["Type2"], totalSlots: "", pricePerKwh: "",
     latitude: "", longitude: "", description: "", status: "AVAILABLE",
 };
 
@@ -46,7 +62,7 @@ export default function StationsManagementPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [editForm, setEditForm] = useState({ name: "", address: "", chargerType: "", totalChargingPoints: 0, pricePerKwh: 0, status: "AVAILABLE" });
+    const [editForm, setEditForm] = useState({ name: "", address: "", chargerType: [] as string[], totalChargingPoints: 0, pricePerKwh: 0, status: "AVAILABLE", description: "" });
     const [dialogOpen, setDialogOpen] = useState(false);
     const [form, setForm] = useState(emptyForm);
     const [submitting, setSubmitting] = useState(false);
@@ -75,7 +91,7 @@ export default function StationsManagementPage() {
                 s.name.toLowerCase().includes(search.toLowerCase()) ||
                 (s.city || "").toLowerCase().includes(search.toLowerCase()) ||
                 (s.address || "").toLowerCase().includes(search.toLowerCase()) ||
-                s.chargerType.toLowerCase().includes(search.toLowerCase())
+                normalizeChargerTypes(s.chargerType).join(" ").toLowerCase().includes(search.toLowerCase())
             ),
         [stations, search]
     );
@@ -107,30 +123,61 @@ export default function StationsManagementPage() {
     const startEditing = (s: Station) => {
         setEditingId(s._id);
         setEditForm({
-            name: s.name, address: s.address || "", chargerType: s.chargerType,
+            name: s.name, address: s.address || "", chargerType: normalizeChargerTypes(s.chargerType),
             totalChargingPoints: s.totalChargingPoints || s.totalSlots, pricePerKwh: s.pricePerKwh, status: s.status || "AVAILABLE",
+            description: s.description || "",
         });
     };
 
     const saveEdit = async (id: string) => {
+        if (editForm.chargerType.length === 0) {
+            toast.error("Select at least one charger type");
+            return;
+        }
         try {
-            await fetch(`/api/stations/${id}`, {
+            const res = await fetch(`/api/stations/${id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     name: editForm.name, address: editForm.address, chargerType: editForm.chargerType,
                     totalChargingPoints: editForm.totalChargingPoints, totalSlots: editForm.totalChargingPoints,
                     pricePerKwh: editForm.pricePerKwh, status: editForm.status,
+                    description: editForm.description || undefined,
                 }),
             });
-            setEditingId(null);
-            fetchStations();
+            if (res.ok) {
+                setEditingId(null);
+                fetchStations();
+                toast.success("Station updated");
+            } else {
+                const data = await res.json();
+                toast.error(data.error || "Failed to save changes");
+            }
         } catch (err) {
             console.error("Failed to save edit:", err);
+            toast.error("Network error. Please try again.");
         }
     };
 
     const cancelEdit = () => setEditingId(null);
+
+    const toggleCreateChargerType = (type: string) => {
+        setForm((prev) => ({
+            ...prev,
+            chargerType: prev.chargerType.includes(type)
+                ? prev.chargerType.filter((item) => item !== type)
+                : [...prev.chargerType, type],
+        }));
+    };
+
+    const toggleEditChargerType = (type: string) => {
+        setEditForm((prev) => ({
+            ...prev,
+            chargerType: prev.chargerType.includes(type)
+                ? prev.chargerType.filter((item) => item !== type)
+                : [...prev.chargerType, type],
+        }));
+    };
 
     const deleteStation = async () => {
         if (!deleteId) return;
@@ -155,6 +202,10 @@ export default function StationsManagementPage() {
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (form.chargerType.length === 0) {
+            toast.error("Select at least one charger type");
+            return;
+        }
         setSubmitting(true);
         try {
             const res = await fetch("/api/stations", {
@@ -245,11 +296,20 @@ export default function StationsManagementPage() {
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2"><Label>City</Label><Input placeholder="e.g. Colombo" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required /></div>
                                 <div className="space-y-2">
-                                    <Label>Charger Type</Label>
-                                    <Select value={form.chargerType} onValueChange={(v) => setForm({ ...form, chargerType: v })}>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                        <SelectContent>{["Type1", "Type2", "CCS", "CHAdeMO", "Tesla"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                                    </Select>
+                                    <Label>Charger Type(s)</Label>
+                                    <div className="grid grid-cols-2 gap-2 rounded-md border p-2">
+                                        {CHARGER_TYPES.map((type) => (
+                                            <label key={type} className="flex items-center gap-2 text-sm">
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-4 w-4 accent-primary"
+                                                    checked={form.chargerType.includes(type)}
+                                                    onChange={() => toggleCreateChargerType(type)}
+                                                />
+                                                {type}
+                                            </label>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                             <div className="space-y-2"><Label>Address</Label><Input placeholder="e.g. 12 York St, Colombo 01" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
@@ -307,6 +367,7 @@ export default function StationsManagementPage() {
                                 <TableHead>Station Name</TableHead>
                                 <TableHead>Address / City</TableHead>
                                 <TableHead>Charger Type</TableHead>
+                                <TableHead>Description</TableHead>
                                 <TableHead className="text-right">Points</TableHead>
                                 <TableHead className="text-right">Price (LKR/kWh)</TableHead>
                                 <TableHead>Status</TableHead>
@@ -335,11 +396,37 @@ export default function StationsManagementPage() {
                                     </TableCell>
                                     <TableCell>
                                         {editingId === s._id ? (
-                                            <select value={editForm.chargerType} onChange={(e) => setEditForm({ ...editForm, chargerType: e.target.value })} className="h-8 text-sm rounded border border-input bg-background px-2">
-                                                <option value="Type1">Type1</option><option value="Type2">Type2</option><option value="CCS">CCS</option><option value="CHAdeMO">CHAdeMO</option><option value="Tesla">Tesla</option>
-                                            </select>
+                                            <div className="space-y-1 rounded border border-input bg-background p-2">
+                                                {CHARGER_TYPES.map((type) => (
+                                                    <label key={type} className="flex items-center gap-2 text-xs">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="h-3.5 w-3.5 accent-primary"
+                                                            checked={editForm.chargerType.includes(type)}
+                                                            onChange={() => toggleEditChargerType(type)}
+                                                        />
+                                                        {type}
+                                                    </label>
+                                                ))}
+                                            </div>
                                         ) : (
-                                            <Badge variant="secondary">{s.chargerType}</Badge>
+                                            <div className="flex flex-wrap gap-1">
+                                                {formatChargerTypes(s.chargerType).map((type) => (
+                                                    <Badge key={`${s._id}-${type}`} variant="secondary">{type}</Badge>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        {editingId === s._id ? (
+                                            <Input
+                                                value={editForm.description}
+                                                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                                                className="h-8 text-sm"
+                                                placeholder="Description"
+                                            />
+                                        ) : (
+                                            <span className="text-sm text-muted-foreground">{s.description || "-"}</span>
                                         )}
                                     </TableCell>
                                     <TableCell className="text-right">

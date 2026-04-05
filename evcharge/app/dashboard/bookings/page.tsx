@@ -48,9 +48,9 @@ export default function BookingsPage() {
         }
 
         setBookings((prev) =>
-            prev.map((b) => (b._id === id ? { ...b, status: "CANCELLED", paymentStatus: "REFUNDED" } : b))
+            prev.map((b) => (b._id === id ? { ...b, status: "CANCELLED" } : b))
         );
-        toast.success("Booking cancelled");
+        toast.success("Booking cancelled. No refund will be issued.");
     };
 
     if (loading) {

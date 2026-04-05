@@ -77,7 +77,7 @@ export default function BookingCard({ booking, onCancel }: BookingCardProps) {
                     <div>
                         <span className="text-lg font-bold text-primary">LKR {booking.amount}</span>
                         <span className="text-xs text-muted-foreground ml-1">
-                            ({booking.paymentStatus})
+                            ({booking.status === "CANCELLED" ? "No Refund" : booking.paymentStatus})
                         </span>
                     </div>
                     {canCancel && (

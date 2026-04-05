@@ -5,19 +5,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Plus, MapPin, Loader2, Navigation } from "lucide-react";
 import { toast } from "sonner";
 
-interface Station { _id: string; name: string; city: string; chargerType: string; totalSlots: number; pricePerKwh: number; rating: number; isApproved: boolean; }
+interface Station { _id: string; name: string; city: string; chargerType: string | string[]; totalSlots: number; pricePerKwh: number; rating: number; isApproved: boolean; }
+
+const CHARGER_TYPES = ["Type1", "Type2", "CCS", "CHAdeMO", "Tesla"] as const;
+
+const normalizeChargerTypes = (value: string | string[] | undefined): string[] => {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (typeof value !== "string" || !value.trim()) return [];
+    return value.split(",").map((t) => t.trim()).filter(Boolean);
+};
 
 export default function OwnerStationsPage() {
     const [stations, setStations] = useState<Station[]>([]);
     const [loading, setLoading] = useState(true);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [form, setForm] = useState({ name: "", city: "", chargerType: "Type2", totalSlots: "", pricePerKwh: "", latitude: "", longitude: "" });
+    const [form, setForm] = useState({ name: "", city: "", chargerType: ["Type2"] as string[], totalSlots: "", pricePerKwh: "", latitude: "", longitude: "" });
     const [geoLoading, setGeoLoading] = useState(false);
 
     const fetchStations = async () => {
@@ -52,6 +60,10 @@ export default function OwnerStationsPage() {
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (form.chargerType.length === 0) {
+            toast.error("Select at least one charger type");
+            return;
+        }
         const res = await fetch("/api/stations", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -67,7 +79,7 @@ export default function OwnerStationsPage() {
             return;
         }
         setDialogOpen(false);
-        setForm({ name: "", city: "", chargerType: "Type2", totalSlots: "", pricePerKwh: "", latitude: "", longitude: "" });
+        setForm({ name: "", city: "", chargerType: ["Type2"], totalSlots: "", pricePerKwh: "", latitude: "", longitude: "" });
         toast.success("Station submitted for approval");
         fetchStations();
     };
@@ -91,7 +103,27 @@ export default function OwnerStationsPage() {
                             <div className="space-y-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2"><Label>City</Label><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required /></div>
-                                <div className="space-y-2"><Label>Charger</Label><Select value={form.chargerType} onValueChange={(v) => setForm({ ...form, chargerType: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["Type1", "Type2", "CCS", "CHAdeMO", "Tesla"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div>
+                                <div className="space-y-2">
+                                    <Label>Charger Type(s)</Label>
+                                    <div className="grid grid-cols-2 gap-2 rounded-md border p-2">
+                                        {CHARGER_TYPES.map((type) => (
+                                            <label key={type} className="flex items-center gap-2 text-sm">
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-4 w-4 accent-primary"
+                                                    checked={form.chargerType.includes(type)}
+                                                    onChange={() => setForm((prev) => ({
+                                                        ...prev,
+                                                        chargerType: prev.chargerType.includes(type)
+                                                            ? prev.chargerType.filter((t) => t !== type)
+                                                            : [...prev.chargerType, type],
+                                                    }))}
+                                                />
+                                                {type}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2"><Label>Slots</Label><Input type="number" value={form.totalSlots} onChange={(e) => setForm({ ...form, totalSlots: e.target.value })} required /></div>
@@ -126,7 +158,7 @@ export default function OwnerStationsPage() {
                                 <div className="grid grid-cols-3 gap-2 text-center text-sm">
                                     <div className="p-2 bg-muted/50 rounded-lg"><div className="font-semibold">{s.totalSlots}</div><div className="text-xs text-muted-foreground">Slots</div></div>
                                     <div className="p-2 bg-muted/50 rounded-lg"><div className="font-semibold">LKR {s.pricePerKwh}</div><div className="text-xs text-muted-foreground">kWh</div></div>
-                                    <div className="p-2 bg-muted/50 rounded-lg"><div className="font-semibold">{s.chargerType}</div><div className="text-xs text-muted-foreground">Type</div></div>
+                                    <div className="p-2 bg-muted/50 rounded-lg"><div className="font-semibold">{normalizeChargerTypes(s.chargerType).join(", ")}</div><div className="text-xs text-muted-foreground">Type</div></div>
                                 </div>
                                 <Button variant="destructive" size="sm" className="w-full" onClick={() => handleDelete(s._id)}>Delete Station</Button>
                             </CardContent>

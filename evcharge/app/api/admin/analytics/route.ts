@@ -23,7 +23,7 @@ export async function GET() {
         const cancelledBookings = await Booking.countDocuments({ status: "CANCELLED" });
 
         const revenueResult = await Booking.aggregate([
-            { $match: { status: { $in: ["CONFIRMED", "COMPLETED"] } } },
+            { $match: { status: { $in: ["CONFIRMED", "COMPLETED", "CANCELLED"] } } },
             { $group: { _id: null, total: { $sum: "$amount" } } },
         ]);
         const totalRevenue = revenueResult[0]?.total || 0;

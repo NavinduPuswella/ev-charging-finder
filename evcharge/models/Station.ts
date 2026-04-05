@@ -9,7 +9,7 @@ export interface IStation extends Document {
         longitude: number;
     };
     city: string;
-    chargerType: "Type1" | "Type2" | "CCS" | "CHAdeMO" | "Tesla";
+    chargerType: string;
     totalSlots: number;
     totalChargingPoints: number;
     pricePerKwh: number;
@@ -49,8 +49,19 @@ const StationSchema = new Schema<IStation>(
         },
         chargerType: {
             type: String,
-            enum: ["Type1", "Type2", "CCS", "CHAdeMO", "Tesla"],
-            required: [true, "Charger type is required"],
+            required: [true, "At least one charger type is required"],
+            trim: true,
+            validate: {
+                validator: (value: string) => {
+                    const validTypes = ["Type1", "Type2", "CCS", "CHAdeMO", "Tesla"];
+                    const types = value
+                        .split(",")
+                        .map((type) => type.trim())
+                        .filter(Boolean);
+                    return types.length > 0 && types.every((type) => validTypes.includes(type));
+                },
+                message: "Invalid charger type selection",
+            },
         },
         totalSlots: {
             type: Number,
@@ -105,7 +116,9 @@ StationSchema.pre("validate", function () {
     }
 });
 
-const Station: Model<IStation> =
-    mongoose.models.Station || mongoose.model<IStation>("Station", StationSchema);
+if (mongoose.models.Station) {
+    mongoose.deleteModel("Station");
+}
+const Station: Model<IStation> = mongoose.model<IStation>("Station", StationSchema);
 
 export default Station;

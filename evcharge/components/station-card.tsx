@@ -28,10 +28,14 @@ export default function StationCard({ station, distance }: StationCardProps) {
             <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                     <CardTitle className="text-lg">{station.name}</CardTitle>
-                    <Badge variant="success" className="shrink-0">
-                        <Zap className="h-3 w-3 mr-1" />
-                        {station.chargerType}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1 shrink-0">
+                        {station.chargerType.split(",").map((t) => t.trim()).filter(Boolean).map((type) => (
+                            <Badge key={type} variant="success">
+                                <Zap className="h-3 w-3 mr-1" />
+                                {type}
+                            </Badge>
+                        ))}
+                    </div>
                 </div>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                     <MapPin className="h-3.5 w-3.5" />

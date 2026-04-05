@@ -5,6 +5,19 @@ import Review from "@/models/Review";
 import { getAuthUser } from "@/lib/auth";
 import { getCurrentOccupancyForStation } from "@/lib/booking-availability";
 
+function normalizeChargerTypes(value: unknown) {
+    if (Array.isArray(value)) {
+        return value.filter((type): type is string => typeof type === "string" && type.trim().length > 0);
+    }
+    if (typeof value === "string" && value.trim().length > 0) {
+        return value
+            .split(",")
+            .map((type) => type.trim())
+            .filter(Boolean);
+    }
+    return [];
+}
+
 function getAvailabilityLabel(
     availableNow: number,
     totalChargingPoints: number,
@@ -89,22 +102,38 @@ export async function PUT(
         const totalChargingPoints = Number(
             body.totalChargingPoints ?? body.totalSlots
         );
-        const updateData = {
-            ...body,
-            totalChargingPoints: Number.isFinite(totalChargingPoints)
-                ? totalChargingPoints
-                : undefined,
-            totalSlots: Number.isFinite(totalChargingPoints)
-                ? totalChargingPoints
-                : undefined,
-            location:
-                body.latitude !== undefined || body.longitude !== undefined
-                    ? {
-                        latitude: Number(body.latitude),
-                        longitude: Number(body.longitude),
-                    }
-                    : body.location,
-        };
+        const chargerTypes =
+            body.chargerType === undefined
+                ? undefined
+                : normalizeChargerTypes(body.chargerType);
+        if (chargerTypes && chargerTypes.length === 0) {
+            return NextResponse.json(
+                { error: "At least one charger type is required." },
+                { status: 400 }
+            );
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updateData: Record<string, any> = {};
+        if (body.name !== undefined) updateData.name = body.name;
+        if (body.address !== undefined) updateData.address = body.address;
+        if (body.city !== undefined) updateData.city = body.city;
+        if (body.description !== undefined) updateData.description = body.description;
+        if (body.status !== undefined) updateData.status = body.status;
+        if (body.pricePerKwh !== undefined) updateData.pricePerKwh = Number(body.pricePerKwh);
+        if (chargerTypes) updateData.chargerType = chargerTypes.join(", ");
+        if (Number.isFinite(totalChargingPoints)) {
+            updateData.totalChargingPoints = totalChargingPoints;
+            updateData.totalSlots = totalChargingPoints;
+        }
+        if (body.latitude !== undefined || body.longitude !== undefined) {
+            updateData.location = {
+                latitude: Number(body.latitude),
+                longitude: Number(body.longitude),
+            };
+        } else if (body.location) {
+            updateData.location = body.location;
+        }
 
         const query = user.role === "ADMIN"
             ? { _id: id }

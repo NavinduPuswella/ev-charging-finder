@@ -46,7 +46,6 @@ export async function PUT(
             }
 
             booking.status = "CANCELLED";
-            booking.paymentStatus = "REFUNDED";
             await booking.save();
             await syncStationSlotStatusesForWindow(
                 String(booking.stationId),
@@ -57,7 +56,7 @@ export async function PUT(
 
             return NextResponse.json({
                 booking,
-                message: "Booking cancelled and refund processed.",
+                message: "Booking cancelled. No refund will be issued.",
             });
         }
 

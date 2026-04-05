@@ -584,9 +584,11 @@ function RouteStopCard({ station, index }: { station: RouteStation; index: numbe
                 </div>
 
                 <div className="mb-4 flex flex-wrap gap-1.5">
-                    <span className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                        <Zap className="h-2.5 w-2.5" /> {station.chargerType}
-                    </span>
+                    {station.chargerType.split(",").map((t: string) => t.trim()).filter(Boolean).map((type: string) => (
+                        <span key={type} className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                            <Zap className="h-2.5 w-2.5" /> {type}
+                        </span>
+                    ))}
                     <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
                         <Map className="h-2.5 w-2.5" /> {station.distanceToRouteKm.toFixed(1)} km off route
                     </span>
