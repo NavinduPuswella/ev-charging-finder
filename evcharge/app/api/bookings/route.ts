@@ -79,6 +79,13 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Station not found" }, { status: 404 });
         }
 
+        if (!station.isApproved || station.status === "INACTIVE" || station.status === "MAINTENANCE") {
+            return NextResponse.json(
+                { error: "This station is currently closed for booking." },
+                { status: 409 }
+            );
+        }
+
         const totalChargingPoints = station.totalChargingPoints || station.totalSlots;
         const overlappingCount = await getOverlappingBookingCount(
             stationId,

@@ -17,7 +17,10 @@ export async function POST(request: Request) {
         const { latitude, longitude, vehicleRange, chargerType } = body;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const filter: any = { isApproved: true };
+        const filter: any = {
+            isApproved: true,
+            status: { $nin: ["INACTIVE", "MAINTENANCE"] },
+        };
         if (chargerType) filter.chargerType = chargerType;
 
         const stations = await Station.find(filter);

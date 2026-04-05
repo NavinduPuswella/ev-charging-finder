@@ -37,7 +37,8 @@ interface Station {
     totalChargingPoints?: number;
     availableNow?: number;
     occupiedNow?: number;
-    availabilityStatus?: "Available" | "Limited Availability" | "Fully Booked";
+    availabilityStatus?: "Available" | "Limited Availability" | "Fully Booked" | "Closed";
+    status?: "AVAILABLE" | "LIMITED" | "MAINTENANCE" | "INACTIVE";
     location: { latitude: number; longitude: number };
     address?: string;
     description?: string;
@@ -106,6 +107,7 @@ function toLocalTimeInputValue(value: string) {
 function getAvailabilityBadge(status: Station["availabilityStatus"]) {
     if (status === "Available") return "success" as const;
     if (status === "Limited Availability") return "warning" as const;
+    if (status === "Closed") return "secondary" as const;
     return "destructive" as const;
 }
 
@@ -377,6 +379,10 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
     const totalChargingPoints = station.totalChargingPoints || station.totalSlots;
     const availableNow = station.availableNow ?? 0;
     const occupiedNow = station.occupiedNow ?? 0;
+    const isClosed =
+        station.status === "INACTIVE" ||
+        station.status === "MAINTENANCE" ||
+        station.availabilityStatus === "Closed";
     const availableSlots = slots
         .filter((slot) => slot.status === "AVAILABLE")
         .filter((slot) => new Date(slot.endTime).getTime() > Date.now())
@@ -430,11 +436,11 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                     <p className="text-base font-semibold">Charging summary</p>
                                     <Button
                                         className="gap-2"
-                                        disabled={availableNow <= 0}
+                                        disabled={availableNow <= 0 || isClosed}
                                         onClick={() => bookingSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
                                     >
                                         <CalendarCheck className="h-4 w-4" />
-                                        {availableNow > 0 ? "Book Slot" : "Fully Booked"}
+                                        {isClosed ? "Closed" : availableNow > 0 ? "Book Slot" : "Fully Booked"}
                                     </Button>
                                 </div>
                                 <div className="grid gap-3 sm:grid-cols-3">
@@ -450,7 +456,11 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                 <CardContent className="space-y-5 p-5">
                                     <div>
                                         <p className="text-lg font-semibold">Book a charging slot</p>
-                                        <p className="text-sm text-muted-foreground">Choose an available slot or set date and time manually.</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {isClosed
+                                                ? "This station is currently closed by admin."
+                                                : "Choose an available slot or set date and time manually."}
+                                        </p>
                                     </div>
 
                                     <div className="space-y-2">
@@ -525,10 +535,15 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
 
                                     <Button
                                         onClick={handleBook}
-                                        disabled={submittingBooking || !bookingAvailability || !bookingAvailability.canBook}
+                                        disabled={
+                                            isClosed ||
+                                            submittingBooking ||
+                                            !bookingAvailability ||
+                                            !bookingAvailability.canBook
+                                        }
                                         className="h-11 w-full text-base font-semibold"
                                     >
-                                        {submittingBooking ? "Processing..." : "Confirm & Pay"}
+                                        {isClosed ? "Station Closed" : submittingBooking ? "Processing..." : "Confirm & Pay"}
                                     </Button>
 
                                     {paymentStatus === "success" ? (

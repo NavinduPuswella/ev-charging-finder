@@ -23,7 +23,7 @@ interface RouteStation {
     rating: number;
     availableNow: number;
     totalChargingPoints: number;
-    availabilityStatus: "Available" | "Limited Availability" | "Fully Booked";
+    availabilityStatus: "Available" | "Limited Availability" | "Fully Booked" | "Closed";
     location: { latitude: number; longitude: number };
     distanceToRouteKm: number;
     distanceFromStartKm: number;
@@ -32,7 +32,14 @@ interface RouteStation {
     estimatedChargeCostLkr: number;
 }
 
-function getAvailabilityLabel(availableNow: number, totalChargingPoints: number) {
+function getAvailabilityLabel(
+    availableNow: number,
+    totalChargingPoints: number,
+    stationStatus?: "AVAILABLE" | "LIMITED" | "MAINTENANCE" | "INACTIVE"
+) {
+    if (stationStatus === "INACTIVE" || stationStatus === "MAINTENANCE") {
+        return "Closed" as const;
+    }
     if (availableNow <= 0) return "Fully Booked" as const;
     if (availableNow <= Math.max(1, Math.ceil(totalChargingPoints * 0.3))) {
         return "Limited Availability" as const;
@@ -165,7 +172,8 @@ export async function POST(request: Request) {
                 const station = stationDoc.toObject();
                 const totalChargingPoints = station.totalChargingPoints || station.totalSlots || 0;
                 const occupiedNow = occupancyMap.get(String(station._id)) || 0;
-                const availableNow = Math.max(totalChargingPoints - occupiedNow, 0);
+                const isClosed = station.status === "INACTIVE" || station.status === "MAINTENANCE";
+                const availableNow = isClosed ? 0 : Math.max(totalChargingPoints - occupiedNow, 0);
                 const estimatedWaitMinutes = estimateWaitMinutes(totalChargingPoints, occupiedNow, availableNow);
                 const typicalTopUpKwh = Math.max(12, Math.min(45, vehicleRangeKm * 0.12));
                 const point = {
@@ -186,7 +194,11 @@ export async function POST(request: Request) {
                     rating: station.rating || 0,
                     availableNow,
                     totalChargingPoints,
-                    availabilityStatus: getAvailabilityLabel(availableNow, totalChargingPoints),
+                    availabilityStatus: getAvailabilityLabel(
+                        availableNow,
+                        totalChargingPoints,
+                        station.status
+                    ),
                     location: station.location,
                     distanceToRouteKm,
                     distanceFromStartKm: progress * distanceKm,

@@ -7,7 +7,7 @@ export interface MapViewStation {
     _id: string;
     name: string;
     city?: string;
-    availabilityStatus?: "Available" | "Limited Availability" | "Fully Booked";
+    availabilityStatus?: "Available" | "Limited Availability" | "Fully Booked" | "Closed";
     location: { latitude: number; longitude: number };
 }
 

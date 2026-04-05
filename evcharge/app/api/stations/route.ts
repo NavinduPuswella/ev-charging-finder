@@ -4,7 +4,14 @@ import Station from "@/models/Station";
 import { getAuthUser } from "@/lib/auth";
 import { getCurrentOccupancyMap } from "@/lib/booking-availability";
 
-function getAvailabilityLabel(availableNow: number, totalChargingPoints: number) {
+function getAvailabilityLabel(
+    availableNow: number,
+    totalChargingPoints: number,
+    stationStatus?: "AVAILABLE" | "LIMITED" | "MAINTENANCE" | "INACTIVE"
+) {
+    if (stationStatus === "INACTIVE" || stationStatus === "MAINTENANCE") {
+        return "Closed";
+    }
     if (availableNow <= 0) return "Fully Booked";
     if (availableNow <= Math.max(1, Math.ceil(totalChargingPoints * 0.3))) {
         return "Limited Availability";
@@ -63,7 +70,11 @@ export async function GET(request: Request) {
                 const totalChargingPoints =
                     stationObj.totalChargingPoints || stationObj.totalSlots || 0;
                 const occupiedNow = occupancyMap.get(String(stationObj._id)) || 0;
-                const availableNow = Math.max(totalChargingPoints - occupiedNow, 0);
+                const isClosed =
+                    stationObj.status === "INACTIVE" || stationObj.status === "MAINTENANCE";
+                const availableNow = isClosed
+                    ? 0
+                    : Math.max(totalChargingPoints - occupiedNow, 0);
 
                 return {
                     ...stationObj,
@@ -73,7 +84,8 @@ export async function GET(request: Request) {
                     occupiedNow,
                     availabilityStatus: getAvailabilityLabel(
                         availableNow,
-                        totalChargingPoints
+                        totalChargingPoints,
+                        stationObj.status
                     ),
                 };
             })

@@ -33,11 +33,36 @@ export async function PUT(request: Request) {
 
         await dbConnect();
         const body = await request.json();
-        const { stationId, isApproved } = body;
+        const { stationId, isApproved, status } = body;
+
+        if (!stationId) {
+            return NextResponse.json({ error: "stationId is required" }, { status: 400 });
+        }
+
+        const allowedStatuses = ["AVAILABLE", "LIMITED", "MAINTENANCE", "INACTIVE"];
+        const updateData: { isApproved?: boolean; status?: string } = {};
+
+        if (typeof isApproved === "boolean") {
+            updateData.isApproved = isApproved;
+        }
+
+        if (typeof status === "string") {
+            if (!allowedStatuses.includes(status)) {
+                return NextResponse.json({ error: "Invalid station status" }, { status: 400 });
+            }
+            updateData.status = status;
+        }
+
+        if (Object.keys(updateData).length === 0) {
+            return NextResponse.json(
+                { error: "Provide at least one updatable field" },
+                { status: 400 }
+            );
+        }
 
         const station = await Station.findByIdAndUpdate(
             stationId,
-            { isApproved },
+            updateData,
             { new: true }
         );
 
@@ -45,10 +70,14 @@ export async function PUT(request: Request) {
             return NextResponse.json({ error: "Station not found" }, { status: 404 });
         }
 
-        return NextResponse.json({
-            station,
-            message: isApproved ? "Station approved" : "Station rejected",
-        });
+        let message = "Station updated";
+        if (typeof status === "string") {
+            message = status === "INACTIVE" ? "Station disabled" : "Station enabled";
+        } else if (typeof isApproved === "boolean") {
+            message = isApproved ? "Station approved" : "Station rejected";
+        }
+
+        return NextResponse.json({ station, message });
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Server error";
         return NextResponse.json({ error: message }, { status: 500 });

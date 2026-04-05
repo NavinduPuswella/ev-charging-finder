@@ -13,7 +13,7 @@ import {
 import type { LatLngExpression } from "leaflet";
 import type { MapPointWithLabel, MapRoutePoint, MapViewStation } from "./map-view";
 
-type Availability = "Available" | "Limited Availability" | "Fully Booked";
+type Availability = "Available" | "Limited Availability" | "Fully Booked" | "Closed";
 
 interface MapViewLeafletProps {
     stations?: MapViewStation[];
@@ -59,6 +59,7 @@ function getStatusColor(status?: Availability) {
     if (status === "Available") return "#16a34a";
     if (status === "Limited Availability") return "#d97706";
     if (status === "Fully Booked") return "#dc2626";
+    if (status === "Closed") return "#475569";
     return "#6b7280";
 }
 

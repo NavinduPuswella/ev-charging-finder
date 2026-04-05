@@ -83,16 +83,17 @@ export default function StationsManagementPage() {
     const toggleEnabled = async (id: string) => {
         const station = stations.find((s) => s._id === id);
         if (!station) return;
-        const newApproved = !station.isApproved;
+        const willDisable = station.status !== "INACTIVE";
+        const nextStatus: Station["status"] = willDisable ? "INACTIVE" : "AVAILABLE";
         try {
             const res = await fetch("/api/admin/stations", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ stationId: id, isApproved: newApproved }),
+                body: JSON.stringify({ stationId: id, status: nextStatus }),
             });
             if (res.ok) {
-                setStations((prev) => prev.map((s) => s._id === id ? { ...s, isApproved: newApproved } : s));
-                toast.success(newApproved ? "Station enabled" : "Station disabled");
+                setStations((prev) => prev.map((s) => s._id === id ? { ...s, status: nextStatus } : s));
+                toast.success(willDisable ? "Station disabled" : "Station enabled");
             } else {
                 const data = await res.json();
                 toast.error(data.error || "Failed to update station status");
@@ -356,8 +357,8 @@ export default function StationsManagementPage() {
                                         )}
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant={s.isApproved ? "success" : "destructive"}>
-                                            {s.isApproved ? (s.status || "AVAILABLE") : "Disabled"}
+                                        <Badge variant={s.status === "INACTIVE" ? "destructive" : "success"}>
+                                            {s.status === "INACTIVE" ? "Closed" : (s.status || "AVAILABLE")}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
@@ -370,8 +371,8 @@ export default function StationsManagementPage() {
                                             ) : (
                                                 <>
                                                     <Button size="sm" variant="outline" className="gap-1" onClick={() => startEditing(s)}><Pencil className="h-3.5 w-3.5" /> Edit</Button>
-                                                    <Button size="sm" variant={s.isApproved ? "destructive" : "default"} className="gap-1" onClick={() => toggleEnabled(s._id)}>
-                                                        <Power className="h-3.5 w-3.5" />{s.isApproved ? "Disable" : "Enable"}
+                                                    <Button size="sm" variant={s.status === "INACTIVE" ? "default" : "destructive"} className="gap-1" onClick={() => toggleEnabled(s._id)}>
+                                                        <Power className="h-3.5 w-3.5" />{s.status === "INACTIVE" ? "Enable" : "Disable"}
                                                     </Button>
                                                     <Button size="sm" variant="destructive" className="gap-1" onClick={() => setDeleteId(s._id)}><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
                                                 </>

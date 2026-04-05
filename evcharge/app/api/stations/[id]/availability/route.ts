@@ -34,6 +34,18 @@ export async function POST(
             return NextResponse.json({ error: "Station not found" }, { status: 404 });
         }
 
+        if (!station.isApproved || station.status === "INACTIVE" || station.status === "MAINTENANCE") {
+            const totalChargingPoints = station.totalChargingPoints || station.totalSlots;
+            return NextResponse.json({
+                totalChargingPoints,
+                availablePoints: 0,
+                occupiedPoints: totalChargingPoints,
+                canBook: false,
+                bookingWindow: null,
+                reason: "Station is currently closed",
+            });
+        }
+
         const startDateTime = buildDateTime(bookingDate, startTimeRaw);
         if (Number.isNaN(startDateTime.getTime())) {
             return NextResponse.json({ error: "Invalid date or start time" }, { status: 400 });

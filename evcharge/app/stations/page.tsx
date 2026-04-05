@@ -29,7 +29,8 @@ interface Station {
     description?: string;
     availableNow?: number;
     occupiedNow?: number;
-    availabilityStatus?: "Available" | "Limited Availability" | "Fully Booked";
+    availabilityStatus?: "Available" | "Limited Availability" | "Fully Booked" | "Closed";
+    status?: "AVAILABLE" | "LIMITED" | "MAINTENANCE" | "INACTIVE";
 }
 
 const CHARGER_OPTIONS = ["CCS", "CHAdeMO", "Type1", "Type2", "Tesla"];
@@ -475,13 +476,21 @@ function StationCard({
 }) {
     const available = station.availableNow || 0;
     const booked = station.occupiedNow || 0;
-    const hasAvailable = available > 0;
+    const isClosed =
+        station.status === "INACTIVE" ||
+        station.status === "MAINTENANCE" ||
+        station.availabilityStatus === "Closed";
+    const hasAvailable = available > 0 && !isClosed;
     const total = station.totalChargingPoints || station.totalSlots || 1;
     const availPercent = (available / total) * 100;
     const statusLabel =
-        station.availabilityStatus || (hasAvailable ? "Available" : "Fully Booked");
+        isClosed
+            ? "Closed"
+            : station.availabilityStatus || (hasAvailable ? "Available" : "Fully Booked");
     const statusTone =
-        statusLabel === "Available"
+        statusLabel === "Closed"
+            ? "text-slate-700 bg-slate-100 border-slate-300"
+            : statusLabel === "Available"
             ? "text-emerald-700 bg-emerald-50 border-emerald-200"
             : statusLabel === "Limited Availability"
                 ? "text-amber-700 bg-amber-50 border-amber-200"
@@ -508,7 +517,7 @@ function StationCard({
                         </div>
                     </div>
                     <Badge className={`shrink-0 border ${statusTone}`}>
-                        <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${hasAvailable ? "bg-emerald-500" : "bg-rose-500"}`} />
+                        <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${statusLabel === "Closed" ? "bg-slate-500" : hasAvailable ? "bg-emerald-500" : "bg-rose-500"}`} />
                         {statusLabel}
                     </Badge>
                 </div>
@@ -548,7 +557,7 @@ function StationCard({
                     <div className="mb-2 flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-700">Availability</span>
                         <span className={`text-xs font-bold ${hasAvailable ? "text-emerald-700" : "text-rose-700"}`}>
-                            {available} available
+                            {isClosed ? "Temporarily closed" : `${available} available`}
                         </span>
                     </div>
                     <div className="mb-2 h-2 overflow-hidden rounded-full bg-slate-200">
@@ -558,7 +567,7 @@ function StationCard({
                         />
                     </div>
                     <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                        <span>{available} available</span>
+                        <span>{isClosed ? "Closed" : `${available} available`}</span>
                         <span>{booked} occupied</span>
                     </div>
                 </div>
@@ -573,7 +582,7 @@ function StationCard({
                     <Link href={`/stations/${station._id}?book=true#booking-section`} className="flex-1">
                         <Button className="h-10 w-full gap-1.5 rounded-xl bg-emerald-600 text-sm hover:bg-emerald-700" disabled={!hasAvailable}>
                             <CalendarCheck className="h-4 w-4" />
-                            {hasAvailable ? "Book Slot" : "Unavailable"}
+                            {isClosed ? "Closed" : hasAvailable ? "Book Slot" : "Unavailable"}
                         </Button>
                     </Link>
                 </div>
