@@ -330,7 +330,7 @@ export default function TripPlanner() {
                     </div>
 
                     <div className="space-y-6 lg:col-span-7 xl:col-span-8">
-                        <Card className="overflow-hidden border bg-white">
+                        <Card className="relative isolate overflow-hidden border bg-white">
                             <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5">
                                 <div className="flex items-center gap-2">
                                     <Route className="h-4 w-4 text-primary" />

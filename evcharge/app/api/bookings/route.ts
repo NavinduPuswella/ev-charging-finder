@@ -67,6 +67,13 @@ export async function POST(request: Request) {
             );
         }
 
+        if (durationHours > 5) {
+            return NextResponse.json(
+                { error: "Maximum booking duration is 5 hours." },
+                { status: 400 }
+            );
+        }
+
         const startTime = buildDateTime(bookingDate, startTimeRaw);
         if (Number.isNaN(startTime.getTime())) {
             return NextResponse.json({ error: "Invalid date or start time" }, { status: 400 });

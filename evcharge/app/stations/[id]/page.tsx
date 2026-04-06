@@ -134,6 +134,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
     const [reviewComment, setReviewComment] = useState("");
     const [reviewRating, setReviewRating] = useState(5);
     const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
+    const [durationError, setDurationError] = useState<string | null>(null);
 
     const refreshStation = async () => {
         const [stationRes, slotsRes] = await Promise.all([
@@ -164,11 +165,20 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
     }, [searchParams]);
 
     useEffect(() => {
+        const parsed = Number(durationHours);
+        if (durationHours !== "" && (!Number.isFinite(parsed) || parsed < 1 || parsed > 5)) {
+            setDurationError("Maximum booking duration is 5 hours.");
+        } else {
+            setDurationError(null);
+        }
+    }, [durationHours]);
+
+    useEffect(() => {
         const run = async () => {
             if (!station) return;
 
             const parsedDuration = Number(durationHours);
-            if (!bookingDate || !startTime || parsedDuration < 1) {
+            if (!bookingDate || !startTime || parsedDuration < 1 || parsedDuration > 5) {
                 setBookingAvailability(null);
                 return;
             }
@@ -205,7 +215,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
         if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
 
         const durationMs = end.getTime() - start.getTime();
-        const duration = Math.max(1, Math.round(durationMs / (1000 * 60 * 60)));
+        const duration = Math.min(5, Math.max(1, Math.round(durationMs / (1000 * 60 * 60))));
 
         setBookingDate(toLocalDateInputValue(slot.startTime));
         setStartTime(toLocalTimeInputValue(slot.startTime));
@@ -218,7 +228,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
         const start = new Date(`${bookingDate}T${startTime}:00`);
         if (Number.isNaN(start.getTime())) return null;
 
-        const hours = Number(durationHours) || 1;
+        const hours = Math.min(5, Number(durationHours) || 1);
         const end = new Date(start.getTime() + hours * 60 * 60 * 1000);
 
         return {
@@ -235,6 +245,12 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
         }
 
         if (!bookingSummary || !station) return;
+
+        const parsedDuration = Number(durationHours);
+        if (!Number.isFinite(parsedDuration) || parsedDuration < 1 || parsedDuration > 5) {
+            setDurationError("Maximum booking duration is 5 hours.");
+            return;
+        }
 
         setSubmittingBooking(true);
         setPaymentStatus(null);
@@ -497,7 +513,17 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Duration (hours)</Label>
-                                            <Input type="number" min="1" max="12" value={durationHours} onChange={(e) => setDurationHours(e.target.value)} />
+                                            <Input
+                                                type="number"
+                                                min="1"
+                                                max="5"
+                                                value={durationHours}
+                                                onChange={(e) => setDurationHours(e.target.value)}
+                                                className={durationError ? "border-red-500 focus-visible:ring-red-500" : ""}
+                                            />
+                                            {durationError && (
+                                                <p className="text-sm text-red-600">{durationError}</p>
+                                            )}
                                         </div>
                                     </div>
 
@@ -541,7 +567,8 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                             isClosed ||
                                             submittingBooking ||
                                             !bookingAvailability ||
-                                            !bookingAvailability.canBook
+                                            !bookingAvailability.canBook ||
+                                            !!durationError
                                         }
                                         className="h-11 w-full text-base font-semibold"
                                     >

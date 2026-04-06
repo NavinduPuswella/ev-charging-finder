@@ -29,6 +29,13 @@ export async function POST(
             );
         }
 
+        if (durationHours > 5) {
+            return NextResponse.json(
+                { error: "Maximum booking duration is 5 hours." },
+                { status: 400 }
+            );
+        }
+
         const station = await Station.findById(id);
         if (!station) {
             return NextResponse.json({ error: "Station not found" }, { status: 404 });

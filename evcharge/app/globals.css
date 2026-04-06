@@ -173,6 +173,10 @@ html {
   animation: scale-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.leaflet-container {
+  z-index: 0;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

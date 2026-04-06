@@ -53,6 +53,7 @@ const BookingSchema = new Schema<IBooking>(
             type: Number,
             required: [true, "Duration is required"],
             min: [1, "Duration must be at least 1 hour"],
+            max: [5, "Maximum booking duration is 5 hours"],
         },
         chargerType: {
             type: String,

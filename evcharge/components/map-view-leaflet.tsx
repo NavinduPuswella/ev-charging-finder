@@ -129,7 +129,7 @@ export default function MapViewLeaflet({
     }, [routePath, validStations, origin, destination]);
 
     return (
-        <div className={`overflow-hidden rounded-xl border border-border ${className}`}>
+        <div className={`relative isolate overflow-hidden rounded-xl border border-border ${className}`}>
             <MapContainer center={mapCenter} zoom={10} scrollWheelZoom className="h-full min-h-[280px] w-full">
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
