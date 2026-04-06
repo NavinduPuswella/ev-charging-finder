@@ -15,21 +15,32 @@ interface AuthState {
     fetchUser: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+let fetchPromise: Promise<void> | null = null;
+
+export const useAuthStore = create<AuthState>((set, get) => ({
     user: null,
     isLoading: true,
 
     fetchUser: async () => {
-        try {
-            const res = await fetch("/api/auth/me");
-            if (res.ok) {
-                const data = await res.json();
-                set({ user: data.user, isLoading: false });
-            } else {
+        if (get().user) return;
+        if (fetchPromise) return fetchPromise;
+
+        fetchPromise = (async () => {
+            try {
+                const res = await fetch("/api/auth/me");
+                if (res.ok) {
+                    const data = await res.json();
+                    set({ user: data.user, isLoading: false });
+                } else {
+                    set({ user: null, isLoading: false });
+                }
+            } catch {
                 set({ user: null, isLoading: false });
+            } finally {
+                fetchPromise = null;
             }
-        } catch {
-            set({ user: null, isLoading: false });
-        }
+        })();
+
+        return fetchPromise;
     },
 }));

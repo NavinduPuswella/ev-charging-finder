@@ -21,12 +21,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (isLoaded && !isSignedIn) {
             router.push("/sign-in");
         } else if (!isLoading && user && user.role !== "ADMIN") {
-            router.push("/");
+            router.replace("/dashboard");
         }
     }, [isLoaded, isSignedIn, isLoading, user, router]);
 
-    if (!isLoaded || !isSignedIn || isLoading) {
-        return <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
+    if (!isLoaded || !isSignedIn || isLoading || !user || user.role !== "ADMIN") {
+        return (
+            <div className="mt-16 flex items-center justify-center min-h-[calc(100vh-4rem)]">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            </div>
+        );
     }
 
     return (

@@ -9,7 +9,7 @@ import Sidebar from "@/components/sidebar";
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const { isLoaded, isSignedIn } = useAuth();
-    const { fetchUser } = useAuthStore();
+    const { user, isLoading, fetchUser } = useAuthStore();
 
     useEffect(() => {
         if (isLoaded && isSignedIn) {
@@ -20,10 +20,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     useEffect(() => {
         if (isLoaded && !isSignedIn) {
             router.push("/sign-in");
+            return;
         }
-    }, [isLoaded, isSignedIn, router]);
 
-    if (!isLoaded || !isSignedIn) {
+        if (!isLoading && user) {
+            if (user.role === "ADMIN") {
+                router.replace("/admin");
+            } else if (user.role === "STATION_OWNER") {
+                router.replace("/owner");
+            }
+        }
+    }, [isLoaded, isSignedIn, isLoading, user, router]);
+
+    if (!isLoaded || !isSignedIn || isLoading || !user || user.role !== "USER") {
         return (
             <div className="mt-16 flex items-center justify-center min-h-[calc(100vh-4rem)]">
                 <div className="flex flex-col items-center gap-3">

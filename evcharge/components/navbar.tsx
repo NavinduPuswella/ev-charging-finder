@@ -11,6 +11,7 @@ import {
     UserButton,
     useUser,
 } from "@clerk/nextjs";
+import { useAuthStore } from "@/store/auth-store";
 import { Button } from "@/components/ui/button";
 import {
     Menu,
@@ -25,12 +26,15 @@ import {
 
 export default function Navbar() {
     const pathname = usePathname();
-    const { user, isLoaded } = useUser();
+    const { user: clerkUser, isLoaded } = useUser();
+    const { user, isLoading: isAuthLoading, fetchUser } = useAuthStore();
     const [mobileOpen, setMobileOpen] = useState(false);
-    const [role, setRole] = useState<string>("USER");
     const [scrolled, setScrolled] = useState(false);
     const [mounted, setMounted] = useState(false);
     const isHome = pathname === "/";
+
+    const role = user?.role ?? "USER";
+    const roleResolved = !isAuthLoading && user !== null;
 
     useEffect(() => {
         setMounted(true);
@@ -43,15 +47,10 @@ export default function Navbar() {
     }, []);
 
     useEffect(() => {
-        if (isLoaded && user) {
-            fetch("/api/auth/me")
-                .then((res) => res.json())
-                .then((data) => {
-                    if (data.user?.role) setRole(data.user.role);
-                })
-                .catch(() => {});
+        if (isLoaded && clerkUser) {
+            fetchUser();
         }
-    }, [isLoaded, user]);
+    }, [isLoaded, clerkUser, fetchUser]);
 
     const navLinks = [
         { href: "/stations", label: "Find Stations", icon: MapPin },
@@ -135,12 +134,16 @@ export default function Navbar() {
                                 </SignUpButton>
                             </SignedOut>
                             <SignedIn>
-                                <Link href={getDashboardLink()}>
-                                    <Button variant="ghost" size="sm" className={`gap-2 rounded-lg px-4 ${isTransparent ? "text-white" : "text-muted-foreground"}`}>
-                                        <DashIcon className="h-4 w-4" />
-                                        Dashboard
-                                    </Button>
-                                </Link>
+                                {roleResolved ? (
+                                    <Link href={getDashboardLink()}>
+                                        <Button variant="ghost" size="sm" className={`gap-2 rounded-lg px-4 ${isTransparent ? "text-white" : "text-muted-foreground"}`}>
+                                            <DashIcon className="h-4 w-4" />
+                                            Dashboard
+                                        </Button>
+                                    </Link>
+                                ) : (
+                                    <div className="h-9 w-28 animate-pulse rounded-lg bg-muted/40" />
+                                )}
                                 <UserButton
                                     afterSignOutUrl="/"
                                     appearance={{
@@ -180,14 +183,18 @@ export default function Navbar() {
                             </Link>
                         ))}
                         <SignedIn>
-                            <Link
-                                href={getDashboardLink()}
-                                onClick={() => setMobileOpen(false)}
-                                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground"
-                            >
-                                <DashIcon className="h-4 w-4" />
-                                Dashboard
-                            </Link>
+                            {roleResolved ? (
+                                <Link
+                                    href={getDashboardLink()}
+                                    onClick={() => setMobileOpen(false)}
+                                    className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground"
+                                >
+                                    <DashIcon className="h-4 w-4" />
+                                    Dashboard
+                                </Link>
+                            ) : (
+                                <div className="h-10 w-full animate-pulse rounded-lg bg-muted/40" />
+                            )}
                             <div className="pt-3 mt-2 border-t border-border">
                                 <UserButton
                                     afterSignOutUrl="/"
