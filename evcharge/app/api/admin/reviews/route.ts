@@ -3,7 +3,7 @@ import dbConnect from "@/lib/db";
 import Review from "@/models/Review";
 import { getAuthUser } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
         const user = await getAuthUser();
         if (!user || user.role !== "ADMIN") {
@@ -11,7 +11,35 @@ export async function GET() {
         }
 
         await dbConnect();
-        const reviews = await Review.find()
+
+        const { searchParams } = new URL(request.url);
+        const stationId = searchParams.get("stationId");
+        const rating = searchParams.get("rating");
+        const month = searchParams.get("month");
+
+        const filter: Record<string, unknown> = {};
+
+        if (stationId) {
+            filter.stationId = stationId;
+        }
+
+        if (rating) {
+            const ratingNum = Number(rating);
+            if (ratingNum >= 1 && ratingNum <= 5) {
+                filter.rating = ratingNum;
+            }
+        }
+
+        if (month) {
+            const [year, mon] = month.split("-").map(Number);
+            if (year && mon) {
+                const start = new Date(year, mon - 1, 1);
+                const end = new Date(year, mon, 1);
+                filter.createdAt = { $gte: start, $lt: end };
+            }
+        }
+
+        const reviews = await Review.find(filter)
             .populate("userId", "name email")
             .populate("stationId", "name city")
             .sort({ createdAt: -1 });

@@ -13,6 +13,28 @@ export function addHours(date: Date, hours: number) {
     return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }
 
+export function isBookingExpired(endTime: Date | string): boolean {
+    return new Date(endTime).getTime() <= Date.now();
+}
+
+export function isCancellable(
+    status: string,
+    endTime: Date | string
+): boolean {
+    return status === "CONFIRMED" && !isBookingExpired(endTime);
+}
+
+export async function autoCompleteExpiredBookings(): Promise<number> {
+    const result = await Booking.updateMany(
+        {
+            status: "CONFIRMED",
+            endTime: { $lte: new Date() },
+        },
+        { $set: { status: "COMPLETED" } }
+    );
+    return result.modifiedCount;
+}
+
 export async function getOverlappingBookingCount(
     stationId: string,
     startTime: Date,

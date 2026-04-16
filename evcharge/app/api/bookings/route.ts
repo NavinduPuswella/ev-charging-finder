@@ -9,6 +9,7 @@ import {
     getOverlappingBookingCount,
     syncStationSlotStatusesForWindow,
     syncStationStatusFromAvailability,
+    autoCompleteExpiredBookings,
 } from "@/lib/booking-availability";
 
 export async function GET() {
@@ -19,6 +20,8 @@ export async function GET() {
         }
 
         await dbConnect();
+
+        await autoCompleteExpiredBookings();
 
         let bookings;
         if (user.role === "ADMIN") {

@@ -36,7 +36,7 @@ export default function BookingCard({ booking, onCancel }: BookingCardProps) {
     const start = new Date(booking.startTime);
     const end = new Date(booking.endTime);
     const canCancel =
-        booking.status === "CONFIRMED" && start.getTime() > Date.now() && !!onCancel;
+        booking.status === "CONFIRMED" && end.getTime() > Date.now() && !!onCancel;
     const stationObj = booking.stationId && typeof booking.stationId === "object" ? booking.stationId : null;
     const stationName = booking.stationName || stationObj?.name || "Station";
     const city = booking.city || stationObj?.city || "Unknown";

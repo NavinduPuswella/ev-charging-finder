@@ -5,6 +5,8 @@ import { getAuthUser } from "@/lib/auth";
 import {
     syncStationSlotStatusesForWindow,
     syncStationStatusFromAvailability,
+    isCancellable,
+    isBookingExpired,
 } from "@/lib/booking-availability";
 import { sendBookingConfirmationEmail } from "@/lib/booking-email";
 
@@ -33,14 +35,43 @@ export async function PUT(
         }
 
         if (status === "CANCELLED") {
+            if (booking.status === "CANCELLED") {
+                return NextResponse.json(
+                    { error: "This booking has already been cancelled." },
+                    { status: 400 }
+                );
+            }
+
+            if (booking.status === "COMPLETED") {
+                return NextResponse.json(
+                    { error: "A completed booking cannot be cancelled." },
+                    { status: 400 }
+                );
+            }
+
+            if (
+                booking.status !== "PENDING_PAYMENT" &&
+                isBookingExpired(booking.endTime)
+            ) {
+                return NextResponse.json(
+                    {
+                        error:
+                            "This booking can no longer be cancelled because the booked time has already passed.",
+                    },
+                    { status: 400 }
+                );
+            }
+
             if (
                 user.role !== "ADMIN" &&
                 booking.status !== "PENDING_PAYMENT" &&
-                booking.startTime &&
-                new Date(booking.startTime).getTime() <= Date.now()
+                !isCancellable(booking.status, booking.endTime)
             ) {
                 return NextResponse.json(
-                    { error: "You can only cancel a booking before its start time" },
+                    {
+                        error:
+                            "This booking can no longer be cancelled because the booked time has already passed.",
+                    },
                     { status: 400 }
                 );
             }

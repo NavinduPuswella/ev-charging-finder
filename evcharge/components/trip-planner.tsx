@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import MapView, { type MapPointWithLabel } from "@/components/map-view";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +22,14 @@ const CHARGER_TYPES = ["CCS", "CHAdeMO", "Type1", "Type2", "Tesla"];
 interface Coordinates {
     lat: number;
     lng: number;
+}
+
+interface AutocompletePlace {
+    name: string;
+    lat: number;
+    lon: number;
+    display_name: string;
+    secondary: string;
 }
 
 interface RouteStation {
@@ -71,22 +79,290 @@ interface TripPlanResponse {
     };
 }
 
-async function geocodeLocation(query: string): Promise<Coordinates | null> {
-    if (!query.trim()) return null;
+const SRI_LANKA_CENTER = { lat: 7.8731, lon: 80.7718 };
+const AUTOCOMPLETE_DEBOUNCE_MS = 320;
+const AUTOCOMPLETE_MIN_CHARS = 2;
+const AUTOCOMPLETE_MAX_RESULTS = 7;
 
-    const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`,
-        { headers: { "Accept-Language": "en" } }
+function buildSecondary(props: Record<string, string | undefined>, mainName: string): string {
+    const parts: string[] = [];
+    if (props.city && props.city !== mainName) parts.push(props.city);
+    if (props.county) parts.push(props.county);
+    if (props.state) parts.push(props.state);
+    if (props.country) parts.push(props.country);
+    const unique = [...new Set(parts)];
+    return unique.length > 0 ? unique.join(", ") : props.country || "";
+}
+
+async function fetchAutocompleteSuggestions(query: string): Promise<AutocompletePlace[]> {
+    const url = new URL("https://photon.komoot.io/api/");
+    url.searchParams.set("q", query);
+    url.searchParams.set("limit", String(AUTOCOMPLETE_MAX_RESULTS + 3));
+    url.searchParams.set("lang", "en");
+    url.searchParams.set("lat", String(SRI_LANKA_CENTER.lat));
+    url.searchParams.set("lon", String(SRI_LANKA_CENTER.lon));
+
+    const res = await fetch(url.toString());
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const features: Array<{
+        geometry: { coordinates: [number, number] };
+        properties: Record<string, string | undefined>;
+    }> = data?.features || [];
+
+    const results: AutocompletePlace[] = [];
+    const seen = new Set<string>();
+
+    for (const feature of features) {
+        const props = feature.properties;
+        const name = props.name || props.city || props.county || "";
+        if (!name) continue;
+
+        const [lon, lat] = feature.geometry.coordinates;
+        const secondary = buildSecondary(props, name);
+        const dedupeKey = `${name.toLowerCase()}|${lat.toFixed(3)}|${lon.toFixed(3)}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+
+        results.push({
+            name,
+            lat,
+            lon,
+            display_name: secondary ? `${name}, ${secondary}` : name,
+            secondary,
+        });
+
+        if (results.length >= AUTOCOMPLETE_MAX_RESULTS) break;
+    }
+
+    return results;
+}
+
+function PlaceAutocomplete({
+    value,
+    onChange,
+    onSelect,
+    placeholder,
+    resolved,
+}: {
+    value: string;
+    onChange: (text: string) => void;
+    onSelect: (place: AutocompletePlace) => void;
+    placeholder: string;
+    resolved: boolean;
+}) {
+    const [suggestions, setSuggestions] = useState<AutocompletePlace[]>([]);
+    const [isOpen, setIsOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+    const [noResults, setNoResults] = useState(false);
+
+    const containerRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const abortRef = useRef<AbortController | null>(null);
+
+    const fetchSuggestions = useCallback(async (query: string) => {
+        if (query.trim().length < AUTOCOMPLETE_MIN_CHARS) {
+            setSuggestions([]);
+            setIsOpen(false);
+            setNoResults(false);
+            return;
+        }
+
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
+        setIsLoading(true);
+        setNoResults(false);
+
+        try {
+            const results = await fetchAutocompleteSuggestions(query);
+            if (controller.signal.aborted) return;
+
+            setSuggestions(results);
+            setNoResults(results.length === 0);
+            setIsOpen(true);
+            setActiveIndex(-1);
+        } catch {
+            if (!controller.signal.aborted) {
+                setSuggestions([]);
+                setNoResults(true);
+                setIsOpen(true);
+            }
+        } finally {
+            if (!controller.signal.aborted) setIsLoading(false);
+        }
+    }, []);
+
+    const handleInputChange = useCallback(
+        (text: string) => {
+            onChange(text);
+
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+
+            if (text.trim().length < AUTOCOMPLETE_MIN_CHARS) {
+                setSuggestions([]);
+                setIsOpen(false);
+                setNoResults(false);
+                setIsLoading(false);
+                return;
+            }
+
+            setIsLoading(true);
+            debounceRef.current = setTimeout(() => {
+                fetchSuggestions(text);
+            }, AUTOCOMPLETE_DEBOUNCE_MS);
+        },
+        [onChange, fetchSuggestions]
     );
-    if (!response.ok) return null;
 
-    const data = (await response.json()) as Array<{ lat: string; lon: string }>;
-    if (!data[0]) return null;
+    const selectPlace = useCallback(
+        (place: AutocompletePlace) => {
+            onSelect(place);
+            setSuggestions([]);
+            setIsOpen(false);
+            setNoResults(false);
+            setActiveIndex(-1);
+        },
+        [onSelect]
+    );
 
-    return {
-        lat: Number(data[0].lat),
-        lng: Number(data[0].lon),
-    };
+    const handleKeyDown = useCallback(
+        (e: React.KeyboardEvent) => {
+            if (!isOpen || suggestions.length === 0) {
+                if (e.key === "Escape") {
+                    setIsOpen(false);
+                }
+                return;
+            }
+
+            switch (e.key) {
+                case "ArrowDown":
+                    e.preventDefault();
+                    setActiveIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0));
+                    break;
+                case "ArrowUp":
+                    e.preventDefault();
+                    setActiveIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1));
+                    break;
+                case "Enter":
+                    e.preventDefault();
+                    if (activeIndex >= 0 && activeIndex < suggestions.length) {
+                        selectPlace(suggestions[activeIndex]);
+                    }
+                    break;
+                case "Escape":
+                    e.preventDefault();
+                    setIsOpen(false);
+                    setActiveIndex(-1);
+                    break;
+            }
+        },
+        [isOpen, suggestions, activeIndex, selectPlace]
+    );
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+                setActiveIndex(-1);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            abortRef.current?.abort();
+        };
+    }, []);
+
+    return (
+        <div ref={containerRef} className="relative">
+            <div className="relative">
+                <Input
+                    ref={inputRef}
+                    placeholder={placeholder}
+                    value={value}
+                    onChange={(e) => handleInputChange(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onFocus={() => {
+                        if (suggestions.length > 0 || noResults) setIsOpen(true);
+                    }}
+                    className={`mt-2 h-11 pr-8 ${
+                        resolved
+                            ? "border-emerald-300 bg-emerald-50/40 ring-1 ring-emerald-200/60"
+                            : ""
+                    }`}
+                    autoComplete="off"
+                />
+                <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 mt-1">
+                    {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : resolved ? (
+                        <MapPin className="h-4 w-4 text-emerald-600" />
+                    ) : null}
+                </div>
+            </div>
+
+            {isOpen && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[320px] overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-200/60">
+                    {suggestions.length > 0 ? (
+                        <ul role="listbox" className="py-1">
+                            {suggestions.map((place, idx) => (
+                                <li
+                                    key={`${place.lat}-${place.lon}-${idx}`}
+                                    role="option"
+                                    aria-selected={idx === activeIndex}
+                                    className={`flex cursor-pointer items-start gap-2.5 px-3 py-2.5 transition-colors ${
+                                        idx === activeIndex
+                                            ? "bg-emerald-50 text-emerald-900"
+                                            : "text-slate-800 hover:bg-slate-50"
+                                    }`}
+                                    onMouseEnter={() => setActiveIndex(idx)}
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        selectPlace(place);
+                                    }}
+                                >
+                                    <MapPin
+                                        className={`mt-0.5 h-4 w-4 shrink-0 ${
+                                            idx === activeIndex ? "text-emerald-600" : "text-slate-400"
+                                        }`}
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-medium leading-tight">
+                                            {place.name}
+                                        </p>
+                                        {place.secondary && (
+                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                                {place.secondary}
+                                            </p>
+                                        )}
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : noResults ? (
+                        <div className="px-4 py-5 text-center">
+                            <SearchX className="mx-auto mb-1.5 h-5 w-5 text-muted-foreground" />
+                            <p className="text-sm font-medium text-slate-700">
+                                No matching places found
+                            </p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                Try a nearby area or broader location name
+                            </p>
+                        </div>
+                    ) : null}
+                </div>
+            )}
+        </div>
+    );
 }
 
 export default function TripPlanner() {
@@ -117,9 +393,6 @@ export default function TripPlanner() {
         );
     };
 
-    const resolveOrigin = async () => originCoords || geocodeLocation(originText);
-    const resolveDestination = async () => destinationCoords || geocodeLocation(destinationText);
-
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -127,24 +400,20 @@ export default function TripPlanner() {
         setError(null);
 
         try {
-            const resolvedOrigin = await resolveOrigin();
-            const resolvedDestination = await resolveDestination();
-
-            if (!resolvedOrigin || !resolvedDestination) {
+            if (!originCoords || !destinationCoords) {
                 setResult(null);
-                setError("Please enter valid origin and destination locations.");
+                setError(
+                    "Please select both origin and destination from the suggestions dropdown so we can resolve their coordinates."
+                );
                 return;
             }
-
-            setOriginCoords(resolvedOrigin);
-            setDestinationCoords(resolvedDestination);
 
             const res = await fetch("/api/trip-plan", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    origin: resolvedOrigin,
-                    destination: resolvedDestination,
+                    origin: originCoords,
+                    destination: destinationCoords,
                     vehicleRangeKm: parseInt(vehicleRange, 10) || 250,
                     chargerType: chargerType === "any" ? undefined : chargerType,
                     corridorKm: parseFloat(corridorKm) || 7,
@@ -236,14 +505,18 @@ export default function TripPlanner() {
                                             <CircleDot className="mt-0.5 h-4 w-4 text-emerald-600" />
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-xs font-medium text-muted-foreground">Origin</p>
-                                                <Input
-                                                    placeholder="e.g. Colombo Fort"
+                                                <PlaceAutocomplete
                                                     value={originText}
-                                                    onChange={(e) => {
-                                                        setOriginText(e.target.value);
+                                                    placeholder="e.g. Colombo Fort"
+                                                    resolved={!!originCoords}
+                                                    onChange={(text) => {
+                                                        setOriginText(text);
                                                         setOriginCoords(null);
                                                     }}
-                                                    className="mt-2 h-11"
+                                                    onSelect={(place) => {
+                                                        setOriginText(place.display_name);
+                                                        setOriginCoords({ lat: place.lat, lng: place.lon });
+                                                    }}
                                                 />
                                             </div>
                                         </div>
@@ -252,14 +525,18 @@ export default function TripPlanner() {
                                             <MapPin className="mt-0.5 h-4 w-4 text-rose-600" />
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-xs font-medium text-muted-foreground">Destination</p>
-                                                <Input
-                                                    placeholder="e.g. Kandy Clock Tower"
+                                                <PlaceAutocomplete
                                                     value={destinationText}
-                                                    onChange={(e) => {
-                                                        setDestinationText(e.target.value);
+                                                    placeholder="e.g. Kandy Clock Tower"
+                                                    resolved={!!destinationCoords}
+                                                    onChange={(text) => {
+                                                        setDestinationText(text);
                                                         setDestinationCoords(null);
                                                     }}
-                                                    className="mt-2 h-11"
+                                                    onSelect={(place) => {
+                                                        setDestinationText(place.display_name);
+                                                        setDestinationCoords({ lat: place.lat, lng: place.lon });
+                                                    }}
                                                 />
                                             </div>
                                         </div>
@@ -320,7 +597,7 @@ export default function TripPlanner() {
                                         </Button>
                                     </div>
 
-                                    <Button type="submit" className="h-12 w-full gap-2 text-base font-semibold" disabled={loading || !originText || !destinationText}>
+                                    <Button type="submit" className="h-12 w-full gap-2 text-base font-semibold" disabled={loading || !originCoords || !destinationCoords}>
                                         {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
                                         {loading ? "Planning your route..." : "Plan EV Trip"}
                                     </Button>
