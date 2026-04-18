@@ -9,6 +9,7 @@ import {
     SignedIn,
     SignedOut,
     UserButton,
+    useAuth,
     useUser,
 } from "@clerk/nextjs";
 import { useAuthStore } from "@/store/auth-store";
@@ -26,18 +27,24 @@ import {
 
 export default function Navbar() {
     const pathname = usePathname();
-    const { user: clerkUser, isLoaded } = useUser();
-    const { user, isLoading: isAuthLoading, fetchUser } = useAuthStore();
+    const { isLoaded } = useAuth();
+    const { user: clerkUser } = useUser();
+    const { user, fetchUser } = useAuthStore();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const [dashboardTheme, setDashboardTheme] = useState<"light" | "dark">("light");
     const isHome = pathname === "/";
+    const isUserDashboardRoute = pathname.startsWith("/dashboard");
+    const useDashboardDarkNavbar = isUserDashboardRoute && dashboardTheme === "dark";
 
     const role = user?.role ?? "USER";
-    const roleResolved = !isAuthLoading && user !== null;
 
     useEffect(() => {
         setMounted(true);
+    }, []);
+
+    useEffect(() => {
         const handleScroll = () => {
             setScrolled(window.scrollY > 50);
         };
@@ -47,10 +54,29 @@ export default function Navbar() {
     }, []);
 
     useEffect(() => {
-        if (isLoaded && clerkUser) {
-            fetchUser();
-        }
-    }, [isLoaded, clerkUser, fetchUser]);
+        fetchUser();
+    }, [fetchUser, clerkUser?.id]);
+
+    useEffect(() => {
+        const syncTheme = () => {
+            const nextTheme = localStorage.getItem("dashboard-theme") ?? localStorage.getItem("theme");
+            setDashboardTheme(nextTheme === "dark" ? "dark" : "light");
+        };
+
+        const onThemeChange = (event: Event) => {
+            const customEvent = event as CustomEvent<"light" | "dark">;
+            setDashboardTheme(customEvent.detail === "dark" ? "dark" : "light");
+        };
+
+        syncTheme();
+        window.addEventListener("storage", syncTheme);
+        window.addEventListener("dashboard-theme-change", onThemeChange as EventListener);
+
+        return () => {
+            window.removeEventListener("storage", syncTheme);
+            window.removeEventListener("dashboard-theme-change", onThemeChange as EventListener);
+        };
+    }, [pathname]);
 
     const navLinks = [
         { href: "/stations", label: "Find Stations", icon: MapPin },
@@ -69,32 +95,27 @@ export default function Navbar() {
         }
     };
 
-    const getDashboardIcon = () => {
-        switch (role) {
-            case "ADMIN":
-                return Shield;
-            case "STATION_OWNER":
-                return Building2;
-            default:
-                return LayoutDashboard;
-        }
-    };
-
-    const DashIcon = getDashboardIcon();
+    const dashboardIcon = role === "ADMIN"
+        ? <Shield className="h-4 w-4" />
+        : role === "STATION_OWNER"
+            ? <Building2 className="h-4 w-4" />
+            : <LayoutDashboard className="h-4 w-4" />;
     const isTransparent = isHome && !scrolled && mounted;
 
     return (
         <nav className={`fixed top-0 z-50 w-full transition-all duration-300 ${isTransparent
             ? "bg-transparent"
-            : "bg-background/80 backdrop-blur-lg border-b border-border"
+            : useDashboardDarkNavbar
+                ? "bg-[#0B0E11]/90 backdrop-blur-lg border-b border-white/10"
+                : "bg-background/80 backdrop-blur-lg border-b border-border"
         }`}>
             <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
                 <Link href="/" className="flex items-center gap-2">
                     <span className="text-xl font-bold tracking-tight">
-                        <span className={`transition-colors duration-300 ${isTransparent ? "text-white" : "text-foreground"}`}>
+                        <span className={`transition-colors duration-300 ${isTransparent || useDashboardDarkNavbar ? "text-white" : "text-foreground"}`}>
                             Charge
                         </span>
-                        <span className={`transition-colors duration-300 ${isTransparent ? "text-green-400" : "text-green-600"}`}>
+                        <span className={`transition-colors duration-300 ${isTransparent || useDashboardDarkNavbar ? "text-green-400" : "text-green-600"}`}>
                             X
                         </span>
                     </span>
@@ -106,8 +127,8 @@ export default function Navbar() {
                             key={href}
                             href={href}
                             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${pathname === href
-                                ? isTransparent ? "bg-white/20 text-white" : "bg-primary/10 text-primary"
-                                : isTransparent ? "text-white/80" : "text-muted-foreground"
+                                ? isTransparent || useDashboardDarkNavbar ? "bg-white/20 text-white" : "bg-primary/10 text-primary"
+                                : isTransparent || useDashboardDarkNavbar ? "text-white/80" : "text-muted-foreground"
                             }`}
                         >
                             <Icon className="h-4 w-4" />
@@ -123,7 +144,7 @@ export default function Navbar() {
                         <>
                             <SignedOut>
                                 <SignInButton mode="redirect">
-                                    <Button variant="ghost" size="sm" className={`rounded-lg px-4 font-medium ${isTransparent ? "text-white" : "text-muted-foreground"}`}>
+                                    <Button variant="ghost" size="sm" className={`rounded-lg px-4 font-medium ${isTransparent || useDashboardDarkNavbar ? "text-white" : "text-muted-foreground"}`}>
                                         Sign In
                                     </Button>
                                 </SignInButton>
@@ -134,16 +155,12 @@ export default function Navbar() {
                                 </SignUpButton>
                             </SignedOut>
                             <SignedIn>
-                                {roleResolved ? (
-                                    <Link href={getDashboardLink()}>
-                                        <Button variant="ghost" size="sm" className={`gap-2 rounded-lg px-4 ${isTransparent ? "text-white" : "text-muted-foreground"}`}>
-                                            <DashIcon className="h-4 w-4" />
-                                            Dashboard
-                                        </Button>
-                                    </Link>
-                                ) : (
-                                    <div className="h-9 w-28 animate-pulse rounded-lg bg-muted/40" />
-                                )}
+                                <Link href={getDashboardLink()}>
+                                    <Button variant="ghost" size="sm" className={`gap-2 rounded-lg px-4 ${isTransparent || useDashboardDarkNavbar ? "text-white" : "text-muted-foreground"}`}>
+                                        {dashboardIcon}
+                                        Dashboard
+                                    </Button>
+                                </Link>
                                 <UserButton
                                     afterSignOutUrl="/"
                                     appearance={{
@@ -158,7 +175,7 @@ export default function Navbar() {
                 </div>
 
                 <button
-                    className={`md:hidden p-2 rounded-lg transition-colors ${isTransparent ? "text-white" : "text-muted-foreground"}`}
+                    className={`md:hidden p-2 rounded-lg transition-colors ${isTransparent || useDashboardDarkNavbar ? "text-white" : "text-muted-foreground"}`}
                     onClick={() => setMobileOpen(!mobileOpen)}
                 >
                     {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -166,7 +183,7 @@ export default function Navbar() {
             </div>
 
             {mobileOpen && (
-                <div className="bg-background border-b border-border p-4 md:hidden">
+                <div className={`${useDashboardDarkNavbar ? "bg-[#0B0E11] border-white/10" : "bg-background border-border"} border-b p-4 md:hidden`}>
                     <div className="flex flex-col gap-1">
                         {navLinks.map(({ href, label, icon: Icon }) => (
                             <Link
@@ -183,18 +200,14 @@ export default function Navbar() {
                             </Link>
                         ))}
                         <SignedIn>
-                            {roleResolved ? (
-                                <Link
-                                    href={getDashboardLink()}
-                                    onClick={() => setMobileOpen(false)}
-                                    className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground"
-                                >
-                                    <DashIcon className="h-4 w-4" />
-                                    Dashboard
-                                </Link>
-                            ) : (
-                                <div className="h-10 w-full animate-pulse rounded-lg bg-muted/40" />
-                            )}
+                            <Link
+                                href={getDashboardLink()}
+                                onClick={() => setMobileOpen(false)}
+                                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground"
+                            >
+                                {dashboardIcon}
+                                Dashboard
+                            </Link>
                             <div className="pt-3 mt-2 border-t border-border">
                                 <UserButton
                                     afterSignOutUrl="/"

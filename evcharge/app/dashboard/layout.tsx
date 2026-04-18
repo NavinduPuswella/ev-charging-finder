@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { useAuthStore } from "@/store/auth-store";
 import Sidebar from "@/components/sidebar";
+import { DashboardThemeProvider } from "@/components/dashboard-theme-provider";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -44,11 +45,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
 
     return (
-        <div className="mt-16 flex min-h-[calc(100vh-4rem)]">
-            <Sidebar role="USER" />
-            <div className="flex-1 bg-muted/30">
-                <div className="p-6 lg:p-8">{children}</div>
+        <DashboardThemeProvider>
+            <div className="mt-16 flex min-h-[calc(100vh-4rem)]">
+                <Sidebar role="USER" />
+                <div className="flex-1 bg-background">
+                    <div className="p-6 lg:p-8">{children}</div>
+                </div>
             </div>
-        </div>
+        </DashboardThemeProvider>
     );
 }

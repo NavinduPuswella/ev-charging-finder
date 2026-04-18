@@ -22,7 +22,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     isLoading: true,
 
     fetchUser: async () => {
-        if (get().user) return;
+        if (get().user) {
+            if (get().isLoading) set({ isLoading: false });
+            return;
+        }
         if (fetchPromise) return fetchPromise;
 
         fetchPromise = (async () => {

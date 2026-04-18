@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useAuthStore } from "@/store/auth-store";
+import { useDashboardTheme } from "@/components/dashboard-theme-provider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,11 +60,10 @@ const statusConfig: Record<string, { variant: "default" | "destructive" | "secon
 
 export default function DashboardPage() {
     const { user } = useAuthStore();
+    const { theme, toggleTheme, themeReady } = useDashboardTheme();
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
-    const [theme, setTheme] = useState<"light" | "dark">("light");
-    const [themeReady, setThemeReady] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -83,15 +83,6 @@ export default function DashboardPage() {
             }
         };
         fetchData();
-    }, []);
-
-    useEffect(() => {
-        const root = document.documentElement;
-        const stored = localStorage.getItem("theme");
-        const initialTheme: "light" | "dark" = stored === "dark" ? "dark" : "light";
-        root.classList.toggle("dark", initialTheme === "dark");
-        setTheme(initialTheme);
-        setThemeReady(true);
     }, []);
 
     const stats = useMemo(() => {
@@ -118,14 +109,6 @@ export default function DashboardPage() {
         } catch (err) {
             console.error(err);
         }
-    };
-
-    const toggleTheme = () => {
-        const nextTheme: "light" | "dark" = theme === "light" ? "dark" : "light";
-        const root = document.documentElement;
-        root.classList.toggle("dark", nextTheme === "dark");
-        localStorage.setItem("theme", nextTheme);
-        setTheme(nextTheme);
     };
 
     if (loading) {
@@ -396,7 +379,8 @@ function BookingRow({
 }) {
     const start = new Date(booking.startTime);
     const end = new Date(booking.endTime);
-    const canCancel = booking.status === "CONFIRMED" && start.getTime() > Date.now();
+    const [now] = useState(() => Date.now());
+    const canCancel = booking.status === "CONFIRMED" && start.getTime() > now;
     const cfg = statusConfig[booking.status] || statusConfig.PENDING;
     const stationObj = booking.stationId && typeof booking.stationId === "object" ? booking.stationId : null;
     const stationName = booking.stationName || stationObj?.name || "Station";

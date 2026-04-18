@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Vehicle from "@/models/Vehicle";
 import { getAuthUser } from "@/lib/auth";
+import { validateVehicleInput } from "@/lib/vehicle-validation";
 
 export async function PUT(
     request: Request,
@@ -16,10 +17,34 @@ export async function PUT(
         await dbConnect();
         const { id } = await params;
         const body = await request.json();
+        const validation = validateVehicleInput({
+            selectedModelId: body.selectedModelId,
+            brand: body.brand,
+            model: body.model,
+            vehicleType: body.vehicleType,
+            batteryCapacity: Number(body.batteryCapacity),
+            rangeKm: Number(body.rangeKm),
+            chargingType: body.chargingType,
+            chargingSpeedKw:
+                body.chargingSpeedKw === "" || body.chargingSpeedKw === undefined
+                    ? undefined
+                    : Number(body.chargingSpeedKw),
+        });
+
+        if (!validation.isValid || !validation.normalized) {
+            return NextResponse.json(
+                {
+                    error: "Vehicle validation failed",
+                    errors: validation.errors,
+                    helper: validation.helper,
+                },
+                { status: 400 }
+            );
+        }
 
         const vehicle = await Vehicle.findOneAndUpdate(
             { _id: id, userId: user.userId },
-            body,
+            validation.normalized,
             { new: true, runValidators: true }
         );
 

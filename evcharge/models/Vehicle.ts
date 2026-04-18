@@ -1,12 +1,19 @@
 import mongoose, { Schema, Model } from "mongoose";
+import { CONNECTOR_TYPES, VEHICLE_TYPES, type ConnectorType, type VehicleType } from "@/lib/ev-config";
 
 export interface IVehicle {
     _id: mongoose.Types.ObjectId;
     userId: mongoose.Types.ObjectId;
+    selectedModelId?: string | null;
+    brand: string;
     model: string;
+    vehicleType: VehicleType;
     batteryCapacity: number;
     rangeKm: number;
-    chargingType: "Type1" | "Type2" | "CCS" | "CHAdeMO" | "Tesla";
+    chargingType: ConnectorType;
+    chargingSpeedKw?: number;
+    supportedConnectors: ConnectorType[];
+    isKnownModel: boolean;
 }
 
 const VehicleSchema = new Schema(
@@ -16,10 +23,25 @@ const VehicleSchema = new Schema(
             ref: "User",
             required: true,
         },
+        selectedModelId: {
+            type: String,
+            default: null,
+            trim: true,
+        },
+        brand: {
+            type: String,
+            required: [true, "Vehicle brand is required"],
+            trim: true,
+        },
         model: {
             type: String,
             required: [true, "Vehicle model is required"],
             trim: true,
+        },
+        vehicleType: {
+            type: String,
+            enum: VEHICLE_TYPES,
+            required: [true, "Vehicle type is required"],
         },
         batteryCapacity: {
             type: Number,
@@ -33,8 +55,21 @@ const VehicleSchema = new Schema(
         },
         chargingType: {
             type: String,
-            enum: ["Type1", "Type2", "CCS", "CHAdeMO", "Tesla"],
+            enum: CONNECTOR_TYPES,
             required: [true, "Charging type is required"],
+        },
+        chargingSpeedKw: {
+            type: Number,
+            min: [1, "Charging speed must be positive"],
+        },
+        supportedConnectors: {
+            type: [String],
+            enum: CONNECTOR_TYPES,
+            default: [],
+        },
+        isKnownModel: {
+            type: Boolean,
+            default: false,
         },
     },
     {

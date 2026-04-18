@@ -75,6 +75,57 @@
   --sidebar: 222.2 47.4% 11.2%;
 }
 
+.dashboard-theme {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.dashboard-theme-dark {
+  --background: 220 18% 6%;
+  --foreground: 210 20% 96%;
+  --card: 220 16% 9%;
+  --card-foreground: 210 20% 96%;
+  --popover: 220 16% 9%;
+  --popover-foreground: 210 20% 96%;
+  --primary: 142 72% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 12% 14%;
+  --secondary-foreground: 210 18% 92%;
+  --muted: 220 11% 14%;
+  --muted-foreground: 220 10% 68%;
+  --accent: 220 10% 16%;
+  --accent-foreground: 210 20% 95%;
+  --destructive: 0 68% 50%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 220 8% 24%;
+  --input: 220 8% 22%;
+  --ring: 142 72% 42%;
+  --sidebar-background: 220 17% 8%;
+  --sidebar-foreground: 210 18% 94%;
+  --sidebar-primary: 142 72% 42%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 12% 14%;
+  --sidebar-accent-foreground: 210 18% 94%;
+  --sidebar-border: 220 8% 22%;
+  --sidebar-ring: 142 72% 42%;
+  --sidebar: 220 18% 8%;
+  --chart-1: 142 72% 42%;
+  --chart-2: 166 66% 40%;
+  --chart-3: 41 86% 56%;
+  --chart-4: 282 58% 63%;
+  --chart-5: 347 77% 61%;
+
+  background-image: radial-gradient(circle at 20% -30%, rgba(34, 197, 94, 0.08), transparent 45%);
+}
+
+.dashboard-theme-dark aside {
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+.dashboard-theme-dark .shadow-sm {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
