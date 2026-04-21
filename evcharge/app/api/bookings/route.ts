@@ -10,6 +10,7 @@ import {
     syncStationSlotStatusesForWindow,
     syncStationStatusFromAvailability,
     autoCompleteExpiredBookings,
+    validateBookingDateRange,
 } from "@/lib/booking-availability";
 
 export async function GET() {
@@ -77,9 +78,21 @@ export async function POST(request: Request) {
             );
         }
 
+        const dateRangeError = validateBookingDateRange(bookingDate);
+        if (dateRangeError) {
+            return NextResponse.json({ error: dateRangeError }, { status: 400 });
+        }
+
         const startTime = buildDateTime(bookingDate, startTimeRaw);
         if (Number.isNaN(startTime.getTime())) {
             return NextResponse.json({ error: "Invalid date or start time" }, { status: 400 });
+        }
+
+        if (startTime.getTime() < Date.now()) {
+            return NextResponse.json(
+                { error: "Booking start time cannot be in the past." },
+                { status: 400 }
+            );
         }
 
         const endTime = addHours(startTime, durationHours);

@@ -286,8 +286,7 @@ export default function Home() {
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Company</p>
               <div className="flex flex-col gap-3">
                 <Link href="/contact" className="text-sm text-foreground">Contact</Link>
-                <span className="text-sm text-foreground">About</span>
-                <span className="text-sm text-foreground">Careers</span>
+               
               </div>
             </div>
 

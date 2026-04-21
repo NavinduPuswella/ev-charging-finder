@@ -36,6 +36,27 @@ function formatDateTime(value: Date | string): string {
     }).format(date);
 }
 
+function formatDateOnly(value: Date | string): string {
+    const date = new Date(value);
+    return new Intl.DateTimeFormat("en-LK", {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        timeZone: "Asia/Colombo",
+    }).format(date);
+}
+
+function formatTimeOnly(value: Date | string): string {
+    const date = new Date(value);
+    return new Intl.DateTimeFormat("en-LK", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: "Asia/Colombo",
+    }).format(date);
+}
+
 function escapeHtml(s: string): string {
     return s
         .replace(/&/g, "&amp;")
@@ -50,8 +71,9 @@ function buildBookingConfirmationHtml(params: {
     stationName: string;
     city: string;
     address?: string;
-    start: string;
-    end: string;
+    bookingDate: string;
+    startTime: string;
+    endTime: string;
     durationHours: number;
     amount: string;
     mapLink: string;
@@ -62,104 +84,205 @@ function buildBookingConfirmationHtml(params: {
         stationName,
         city,
         address,
-        start,
-        end,
+        bookingDate,
+        startTime,
+        endTime,
         durationHours,
         amount,
         mapLink,
     } = params;
-    const row = (label: string, value: string) => `
+
+    const FONT =
+        "-apple-system,BlinkMacSystemFont,'Segoe UI','Inter','Helvetica Neue',Arial,sans-serif";
+    const MONO = "'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace";
+    const GREEN = "#00A844";
+    const GREEN_DEEP = "#008536";
+    const INK = "#0A0A0A";
+    const INK_SOFT = "#2A2A2A";
+    const MUTED = "#6B7280";
+    const HAIRLINE = "#ECECEC";
+    const PAGE_BG = "#F5F5F6";
+
+    const detailRow = (label: string, value: string, isLast = false) => `
         <tr>
-            <td style="padding:14px 0;border-bottom:1px solid #e5e7eb;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:13px;color:#6b7280;width:38%;vertical-align:top;">
+            <td style="padding:13px 0;${isLast ? "" : `border-bottom:1px solid ${HAIRLINE};`}font-family:${FONT};font-size:13px;line-height:1.4;color:${MUTED};font-weight:500;width:40%;vertical-align:top;">
                 ${label}
             </td>
-            <td style="padding:14px 0;border-bottom:1px solid #e5e7eb;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:14px;color:#111827;font-weight:600;vertical-align:top;">
+            <td align="right" style="padding:13px 0;${isLast ? "" : `border-bottom:1px solid ${HAIRLINE};`}font-family:${FONT};font-size:14px;line-height:1.45;color:${INK};font-weight:600;vertical-align:top;">
                 ${value}
             </td>
         </tr>`;
 
-    return `
-<!DOCTYPE html>
+    const eyebrow = (text: string) => `
+        <div style="font-family:${FONT};font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:${MUTED};font-weight:700;margin:0 0 14px;">
+            ${text}
+        </div>`;
+
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Booking confirmed</title>
+    <meta name="x-apple-disable-message-reformatting">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
+    <title>Booking Confirmed &middot; ChargeX</title>
 </head>
-<body style="margin:0;padding:0;background-color:#f3f4f6;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f3f4f6;">
+<body style="margin:0;padding:0;background-color:${PAGE_BG};-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;font-size:1px;line-height:1px;">
+        Your ChargeX charging slot is reserved &middot; ${bookingDate} &middot; ${stationName}
+    </div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:${PAGE_BG};">
         <tr>
-            <td align="center" style="padding:24px 12px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;border:1px solid #d1d5db;border-radius:16px;overflow:hidden;background-color:#ffffff;box-shadow:0 8px 24px rgba(17,24,39,0.08);">
+            <td align="center" style="padding:28px 14px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:472px;background-color:#ffffff;border:1px solid ${HAIRLINE};border-radius:16px;overflow:hidden;">
+
                     <tr>
-                        <td style="background-color:#16a34a;padding:28px 24px;">
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                        <td style="background-color:#ffffff;padding:24px 24px;border-bottom:1px solid ${HAIRLINE};">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
-                                    <td style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:24px;font-weight:800;line-height:1;color:#ffffff;">
-                                        <span style="color:#bbf7d0;">Charge</span><span style="color:#ffffff;">X</span>
+                                    <td style="font-family:${FONT};font-size:18px;font-weight:800;letter-spacing:-0.02em;line-height:1;color:${INK};">
+                                        <span style="color:${INK};">Charge</span><span style="color:${GREEN};">X</span>
                                     </td>
                                     <td align="right" style="vertical-align:middle;">
-                                        <span style="display:inline-block;background-color:#15803d;color:#ffffff;border-radius:999px;padding:6px 10px;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:12px;font-weight:700;">
-                                            &#10003; Confirmed
+                                        <span style="display:inline-block;background-color:${GREEN};color:#ffffff;border:1px solid ${GREEN_DEEP};border-radius:999px;padding:10px 18px;font-family:${FONT};font-size:13px;font-weight:800;letter-spacing:0.04em;line-height:1;text-transform:uppercase;">
+                                            Confirmed
                                         </span>
                                     </td>
                                 </tr>
                             </table>
-                            <h1 style="margin:16px 0 0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:30px;font-weight:800;line-height:1.2;color:#ffffff;">
-                                Booking Confirmed
-                            </h1>
                         </td>
                     </tr>
+
                     <tr>
-                        <td style="padding:28px 24px;">
-                            <p style="margin:0 0 14px;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:16px;font-weight:600;line-height:1.5;color:#111827;">
+                        <td style="background-color:#ffffff;padding:34px 24px 10px;">
+                            <h1 style="margin:0;font-family:${FONT};font-size:31px;line-height:1.12;font-weight:800;letter-spacing:-0.028em;color:${INK};">
+                                Booking Confirmed
+                            </h1>
+                            <p style="margin:12px 0 0;font-family:${FONT};font-size:15px;line-height:1.55;color:${MUTED};font-weight:400;">
+                                Your charging slot is reserved. A summary of your booking is below.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background-color:#ffffff;padding:26px 24px 2px;">
+                            <p style="margin:0;font-family:${FONT};font-size:15px;line-height:1.5;color:${INK};font-weight:600;">
                                 Hi ${name},
                             </p>
-                            <p style="margin:0 0 24px;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.7;color:#374151;">
-                                Your charging slot has been successfully reserved. Your payment is complete and your session is ready.
+                            <p style="margin:6px 0 0;font-family:${FONT};font-size:14px;line-height:1.6;color:${INK_SOFT};">
+                                Thanks for booking with ChargeX. We&rsquo;ve saved your spot &mdash; just arrive on time and plug in.
                             </p>
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:14px;">
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding:30px 24px 0;">
+                            <div style="height:1px;background-color:${HAIRLINE};line-height:1px;font-size:0;">&nbsp;</div>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background-color:#ffffff;padding:24px 24px 6px;">
+                            ${eyebrow("Booking Details")}
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
+                                ${detailRow("Booking ID", `<span style="font-family:${MONO};font-size:12.5px;color:${INK_SOFT};letter-spacing:0.01em;">${bookingId}</span>`)}
+                                ${detailRow("Station", stationName)}
+                                ${detailRow("City", city)}
+                                ${address ? detailRow("Address", address) : ""}
+                                ${detailRow("Date", bookingDate)}
+                                ${detailRow("Start Time", startTime)}
+                                ${detailRow("End Time", endTime)}
+                                ${detailRow("Duration", `${durationHours} hour${durationHours === 1 ? "" : "s"}`, true)}
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding:24px 24px 0;">
+                            <div style="height:1px;background-color:${HAIRLINE};line-height:1px;font-size:0;">&nbsp;</div>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background-color:#ffffff;padding:24px 24px 6px;">
+                            ${eyebrow("Payment Summary")}
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
                                 <tr>
-                                    <td style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#16a34a;font-weight:700;">
-                                        Booking details
+                                    <td style="padding:6px 0;font-family:${FONT};font-size:13px;color:${MUTED};font-weight:500;">
+                                        Amount Paid
+                                    </td>
+                                    <td align="right" style="padding:6px 0;font-family:${FONT};font-size:14px;color:${INK_SOFT};font-weight:600;">
+                                        LKR ${amount}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:6px 0 14px;font-family:${FONT};font-size:13px;color:${MUTED};font-weight:500;">
+                                        Payment Status
+                                    </td>
+                                    <td align="right" style="padding:6px 0 14px;font-family:${FONT};font-size:13px;font-weight:600;line-height:1.4;color:${GREEN};">
+                                        Paid
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td colspan="2" style="padding:0;">
+                                        <div style="height:1px;background-color:${HAIRLINE};line-height:1px;font-size:0;">&nbsp;</div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:16px 0 0;font-family:${FONT};font-size:15px;color:${INK};font-weight:700;letter-spacing:-0.005em;">
+                                        Total
+                                    </td>
+                                    <td align="right" style="padding:16px 0 0;font-family:${FONT};font-size:20px;color:${INK};font-weight:800;letter-spacing:-0.015em;">
+                                        LKR ${amount}
                                     </td>
                                 </tr>
                             </table>
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
-                                ${row("Booking ID", bookingId)}
-                                ${row("Station Name", stationName)}
-                                ${row("City", city)}
-                                ${address ? row("Address", address) : ""}
-                                ${row("Start Time", start)}
-                                ${row("End Time", end)}
-                                ${row("Duration", `${durationHours} hour(s)`)}
-                                ${row("Amount paid", `LKR ${amount}`)}
-                                ${row("Payment Status", `<span style="color:#166534;font-size:14px;font-weight:700;line-height:1.4;">Paid</span>`)}
-                            </table>
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:22px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background-color:#ffffff;padding:30px 24px 6px;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
-                                    <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#16a34a;font-weight:700;">
-                                        Station map
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td align="center" style="padding:16px 14px;background-color:#f9fafb;">
-                                        <a href="${mapLink}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background-color:#16a34a;color:#ffffff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:13px;font-weight:700;line-height:1;text-decoration:none;padding:10px 14px;border-radius:999px;">
+                                    <td>
+                                        <a href="${mapLink}" target="_blank" rel="noopener noreferrer"
+                                           style="display:block;background-color:${INK};color:#ffffff;font-family:${FONT};font-size:15px;font-weight:600;line-height:1;text-align:center;text-decoration:none;padding:16px 20px;border-radius:12px;letter-spacing:0.005em;">
                                             View on Map
                                         </a>
                                     </td>
                                 </tr>
+                                <tr>
+                                    <td align="center" style="padding-top:10px;font-family:${FONT};font-size:12px;color:${MUTED};line-height:1.5;">
+                                        Opens the station location in Google Maps.
+                                    </td>
+                                </tr>
                             </table>
-                            <p style="margin:22px 0 0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:14px;line-height:1.7;color:#374151;">
-                                Thank you for choosing ChargeX.
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding:30px 24px 0;">
+                            <div style="height:1px;background-color:${HAIRLINE};line-height:1px;font-size:0;">&nbsp;</div>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background-color:#ffffff;padding:24px 24px 24px;">
+                            <p style="margin:0;font-family:${FONT};font-size:14px;line-height:1.55;color:${INK_SOFT};font-weight:500;">
+                                Thanks for choosing <span style="color:${INK};font-weight:700;">Charge</span><span style="color:${GREEN};font-weight:700;">X</span>.
+                            </p>
+                            <p style="margin:8px 0 0;font-family:${FONT};font-size:12px;line-height:1.6;color:${MUTED};">
+                                This is an automated message sent from an unmonitored address. Please do not reply.
                             </p>
                         </td>
                     </tr>
+                </table>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:472px;">
                     <tr>
-                        <td style="padding:20px 24px 26px;border-top:1px solid #e5e7eb;background-color:#ffffff;">
-                            <p style="margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:12px;line-height:1.6;color:#6b7280;">
-                                This is an automated message. Please keep this email for your records.
-                            </p>
+                        <td align="center" style="padding:14px 16px 6px;font-family:${FONT};font-size:11px;line-height:1.6;color:${MUTED};">
+                            &copy; ChargeX
                         </td>
                     </tr>
                 </table>
@@ -236,8 +359,9 @@ export async function sendBookingConfirmationEmail(booking: IBooking): Promise<v
         stationName: escapeHtml(booking.stationName),
         city: escapeHtml(booking.city),
         address: station?.address ? escapeHtml(station.address) : undefined,
-        start: escapeHtml(formatDateTime(booking.startTime)),
-        end: escapeHtml(formatDateTime(booking.endTime)),
+        bookingDate: escapeHtml(formatDateOnly(booking.startTime)),
+        startTime: escapeHtml(formatTimeOnly(booking.startTime)),
+        endTime: escapeHtml(formatTimeOnly(booking.endTime)),
         durationHours: booking.durationHours,
         amount: escapeHtml(amount),
         mapLink: escapeHtml(mapData.mapLink),

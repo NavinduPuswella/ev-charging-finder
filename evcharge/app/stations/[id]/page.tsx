@@ -71,9 +71,47 @@ interface SlotData {
     status: "AVAILABLE" | "BOOKED";
 }
 
+function toDateInputString(date: Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
 function getTodayDateString() {
-    const now = new Date();
-    return now.toISOString().split("T")[0];
+    return toDateInputString(new Date());
+}
+
+function getMaxBookingDateString() {
+    const max = new Date();
+    max.setHours(0, 0, 0, 0);
+    max.setFullYear(max.getFullYear() + 1);
+    return toDateInputString(max);
+}
+
+function parseDateInputString(value: string) {
+    if (!value) return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return null;
+    const [, y, m, d] = match;
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    if (Number.isNaN(date.getTime())) return null;
+    date.setHours(0, 0, 0, 0);
+    return date;
+}
+
+function clampBookingDate(value: string) {
+    const parsed = parseDateInputString(value);
+    if (!parsed) return getTodayDateString();
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const max = new Date(today);
+    max.setFullYear(max.getFullYear() + 1);
+
+    if (parsed.getTime() < today.getTime()) return toDateInputString(today);
+    if (parsed.getTime() > max.getTime()) return toDateInputString(max);
+    return toDateInputString(parsed);
 }
 
 function getNextHourTimeString() {
@@ -90,10 +128,7 @@ function formatLkr(value: number) {
 function toLocalDateInputValue(value: string) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return toDateInputString(date);
 }
 
 function toLocalTimeInputValue(value: string) {
@@ -135,6 +170,46 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
     const [reviewRating, setReviewRating] = useState(5);
     const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
     const [durationError, setDurationError] = useState<string | null>(null);
+    const [dateError, setDateError] = useState<string | null>(null);
+
+    const minBookingDate = useMemo(() => getTodayDateString(), []);
+    const maxBookingDate = useMemo(() => getMaxBookingDateString(), []);
+
+    const validateBookingDate = (value: string): string | null => {
+        const parsed = parseDateInputString(value);
+        if (!parsed) return "Please select a valid booking date.";
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const max = new Date(today);
+        max.setFullYear(max.getFullYear() + 1);
+
+        if (parsed.getTime() < today.getTime()) {
+            return "Booking date cannot be in the past.";
+        }
+        if (parsed.getTime() > max.getTime()) {
+            return "You can only book up to one year in advance.";
+        }
+        return null;
+    };
+
+    const handleBookingDateChange = (value: string) => {
+        setBookingDate(value);
+        setDateError(value ? validateBookingDate(value) : "Please select a booking date.");
+    };
+
+    const handleBookingDateBlur = () => {
+        if (!bookingDate) {
+            setBookingDate(getTodayDateString());
+            setDateError(null);
+            return;
+        }
+        const clamped = clampBookingDate(bookingDate);
+        if (clamped !== bookingDate) {
+            setBookingDate(clamped);
+        }
+        setDateError(validateBookingDate(clamped));
+    };
 
     const refreshStation = async () => {
         const [stationRes, slotsRes] = await Promise.all([
@@ -183,6 +258,11 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                 return;
             }
 
+            if (validateBookingDate(bookingDate)) {
+                setBookingAvailability(null);
+                return;
+            }
+
             setCheckingAvailability(true);
             try {
                 const res = await fetch(`/api/stations/${id}/availability`, {
@@ -217,7 +297,9 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
         const durationMs = end.getTime() - start.getTime();
         const duration = Math.min(5, Math.max(1, Math.round(durationMs / (1000 * 60 * 60))));
 
-        setBookingDate(toLocalDateInputValue(slot.startTime));
+        const slotDate = toLocalDateInputValue(slot.startTime);
+        setBookingDate(slotDate);
+        setDateError(slotDate ? validateBookingDate(slotDate) : null);
         setStartTime(toLocalTimeInputValue(slot.startTime));
         setDurationHours(String(duration));
     }, [selectedSlotId, slots]);
@@ -249,6 +331,13 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
         const parsedDuration = Number(durationHours);
         if (!Number.isFinite(parsedDuration) || parsedDuration < 1 || parsedDuration > 5) {
             setDurationError("Maximum booking duration is 5 hours.");
+            return;
+        }
+
+        const dateValidation = validateBookingDate(bookingDate);
+        if (dateValidation) {
+            setDateError(dateValidation);
+            toast.error(dateValidation);
             return;
         }
 
@@ -505,7 +594,22 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                     <div className="grid gap-4 sm:grid-cols-3">
                                         <div className="space-y-2">
                                             <Label>Date</Label>
-                                            <Input type="date" value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} />
+                                            <Input
+                                                type="date"
+                                                value={bookingDate}
+                                                min={minBookingDate}
+                                                max={maxBookingDate}
+                                                onChange={(e) => handleBookingDateChange(e.target.value)}
+                                                onBlur={handleBookingDateBlur}
+                                                className={dateError ? "border-red-500 focus-visible:ring-red-500" : ""}
+                                            />
+                                            {dateError ? (
+                                                <p className="text-sm text-red-600">{dateError}</p>
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground">
+                                                    Book from today up to {new Date(maxBookingDate).toLocaleDateString()}.
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Start Time</Label>
@@ -568,7 +672,8 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                             submittingBooking ||
                                             !bookingAvailability ||
                                             !bookingAvailability.canBook ||
-                                            !!durationError
+                                            !!durationError ||
+                                            !!dateError
                                         }
                                         className="h-11 w-full text-base font-semibold"
                                     >

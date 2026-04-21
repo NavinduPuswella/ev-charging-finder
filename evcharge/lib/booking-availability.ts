@@ -9,6 +9,41 @@ export function buildDateTime(bookingDate: string, startTime: string) {
     return new Date(`${bookingDate}T${startTime}:00`);
 }
 
+/**
+ * Validates that a bookingDate (YYYY-MM-DD string) falls within the allowed
+ * booking window: from today (inclusive) to today + 1 year (inclusive).
+ * Returns a user-friendly error message, or null if valid.
+ */
+export function validateBookingDateRange(bookingDate: string): string | null {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(bookingDate);
+    if (!match) return "Invalid booking date format.";
+
+    const [, y, m, d] = match;
+    const parsed = new Date(Number(y), Number(m) - 1, Number(d));
+    if (Number.isNaN(parsed.getTime())) return "Invalid booking date.";
+    parsed.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Allow 1 day of tolerance on the lower bound so clients in timezones
+    // ahead/behind the server aren't rejected for their own "today".
+    const minAllowed = new Date(today);
+    minAllowed.setDate(minAllowed.getDate() - 1);
+
+    const max = new Date(today);
+    max.setFullYear(max.getFullYear() + 1);
+    max.setDate(max.getDate() + 1);
+
+    if (parsed.getTime() < minAllowed.getTime()) {
+        return "Booking date cannot be in the past.";
+    }
+    if (parsed.getTime() > max.getTime()) {
+        return "Booking date must be within the next 12 months.";
+    }
+    return null;
+}
+
 export function addHours(date: Date, hours: number) {
     return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }

@@ -5,6 +5,7 @@ import {
     addHours,
     buildDateTime,
     getOverlappingBookingCount,
+    validateBookingDateRange,
 } from "@/lib/booking-availability";
 
 export async function POST(
@@ -34,6 +35,11 @@ export async function POST(
                 { error: "Maximum booking duration is 5 hours." },
                 { status: 400 }
             );
+        }
+
+        const dateRangeError = validateBookingDateRange(bookingDate);
+        if (dateRangeError) {
+            return NextResponse.json({ error: dateRangeError }, { status: 400 });
         }
 
         const station = await Station.findById(id);
