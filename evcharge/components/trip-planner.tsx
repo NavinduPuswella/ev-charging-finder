@@ -15,13 +15,34 @@ import {
     Route, MapPin, Zap, Star, Navigation, Loader2, Battery,
     Search, CalendarCheck, SearchX, AlertTriangle, Map,
     Clock3, Gauge, Bot, Coins, ArrowRight, CircleDot, SlidersHorizontal,
+    Plus, Trash2, ArrowUp, ArrowDown,
 } from "lucide-react";
 
 const CHARGER_TYPES = ["CCS", "CHAdeMO", "Type1", "Type2", "Tesla"];
+const MAX_WAYPOINTS = 3;
 
 interface Coordinates {
     lat: number;
     lng: number;
+}
+
+interface Waypoint {
+    id: string;
+    text: string;
+    coords: Coordinates | null;
+}
+
+function createWaypoint(): Waypoint {
+    return {
+        id: `wp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        text: "",
+        coords: null,
+    };
+}
+
+function coordsAreEqual(a: Coordinates | null, b: Coordinates | null) {
+    if (!a || !b) return false;
+    return Math.abs(a.lat - b.lat) < 1e-5 && Math.abs(a.lng - b.lng) < 1e-5;
 }
 
 interface AutocompletePlace {
@@ -370,6 +391,7 @@ export default function TripPlanner() {
     const [destinationText, setDestinationText] = useState("");
     const [originCoords, setOriginCoords] = useState<Coordinates | null>(null);
     const [destinationCoords, setDestinationCoords] = useState<Coordinates | null>(null);
+    const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
     const [vehicleRange, setVehicleRange] = useState("250");
     const [chargerType, setChargerType] = useState("any");
     const [corridorKm, setCorridorKm] = useState("7");
@@ -378,6 +400,74 @@ export default function TripPlanner() {
     const [result, setResult] = useState<TripPlanResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [geoLoading, setGeoLoading] = useState(false);
+
+    const addWaypoint = useCallback(() => {
+        setWaypoints((current) => {
+            if (current.length >= MAX_WAYPOINTS) return current;
+            return [...current, createWaypoint()];
+        });
+    }, []);
+
+    const removeWaypoint = useCallback((id: string) => {
+        setWaypoints((current) => current.filter((wp) => wp.id !== id));
+    }, []);
+
+    const updateWaypointText = useCallback((id: string, text: string) => {
+        setWaypoints((current) =>
+            current.map((wp) => (wp.id === id ? { ...wp, text, coords: null } : wp))
+        );
+    }, []);
+
+    const selectWaypointPlace = useCallback(
+        (id: string, place: AutocompletePlace) => {
+            setWaypoints((current) =>
+                current.map((wp) =>
+                    wp.id === id
+                        ? { ...wp, text: place.display_name, coords: { lat: place.lat, lng: place.lon } }
+                        : wp
+                )
+            );
+        },
+        []
+    );
+
+    const moveWaypoint = useCallback((id: string, direction: -1 | 1) => {
+        setWaypoints((current) => {
+            const index = current.findIndex((wp) => wp.id === id);
+            if (index === -1) return current;
+            const targetIndex = index + direction;
+            if (targetIndex < 0 || targetIndex >= current.length) return current;
+            const next = [...current];
+            [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+            return next;
+        });
+    }, []);
+
+    const duplicateLocationExists = useMemo(() => {
+        const allCoords: Coordinates[] = [];
+        if (originCoords) allCoords.push(originCoords);
+        if (destinationCoords) allCoords.push(destinationCoords);
+        for (const wp of waypoints) if (wp.coords) allCoords.push(wp.coords);
+
+        for (let i = 0; i < allCoords.length; i += 1) {
+            for (let j = i + 1; j < allCoords.length; j += 1) {
+                if (coordsAreEqual(allCoords[i], allCoords[j])) return true;
+            }
+        }
+        return false;
+    }, [originCoords, destinationCoords, waypoints]);
+
+    const hasEmptyWaypoint = useMemo(
+        () => waypoints.some((wp) => !wp.coords),
+        [waypoints]
+    );
+
+    const canSubmit =
+        !loading &&
+        !!originCoords &&
+        !!destinationCoords &&
+        !hasEmptyWaypoint &&
+        !duplicateLocationExists;
 
     const useCurrentLocation = () => {
         if (!navigator.geolocation) return;
@@ -408,12 +498,31 @@ export default function TripPlanner() {
                 return;
             }
 
+            if (hasEmptyWaypoint) {
+                setResult(null);
+                setError(
+                    "One of your stops doesn't have a confirmed location. Pick a suggestion from the dropdown or remove the empty stop."
+                );
+                return;
+            }
+
+            if (duplicateLocationExists) {
+                setResult(null);
+                setError(
+                    "Two or more locations are the same. Please make sure origin, destination and each stop are different."
+                );
+                return;
+            }
+
             const res = await fetch("/api/trip-plan", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     origin: originCoords,
                     destination: destinationCoords,
+                    waypoints: waypoints
+                        .map((wp) => wp.coords)
+                        .filter((c): c is Coordinates => !!c),
                     vehicleRangeKm: parseInt(vehicleRange, 10) || 250,
                     chargerType: chargerType === "any" ? undefined : chargerType,
                     corridorKm: parseFloat(corridorKm) || 7,
@@ -443,6 +552,21 @@ export default function TripPlanner() {
     const mapDestination: MapPointWithLabel | undefined = destinationCoords
         ? { lat: destinationCoords.lat, lng: destinationCoords.lng, label: "Destination" }
         : undefined;
+    const mapWaypoints: MapPointWithLabel[] = useMemo(
+        () =>
+            waypoints
+                .map((wp, idx) =>
+                    wp.coords
+                        ? {
+                              lat: wp.coords.lat,
+                              lng: wp.coords.lng,
+                              label: wp.text || `Stop ${idx + 1}`,
+                          }
+                        : null
+                )
+                .filter((p): p is MapPointWithLabel => !!p),
+        [waypoints]
+    );
 
     const highlightedStationIds = useMemo(
         () => result?.recommendedStops.map((station) => station._id) || [],
@@ -520,7 +644,45 @@ export default function TripPlanner() {
                                                 />
                                             </div>
                                         </div>
-                                        <div className="my-2 ml-2 h-4 w-px bg-border" />
+
+                                        {waypoints.length > 0 && (
+                                            <div className="mt-3 space-y-2.5 border-l border-dashed border-slate-300 pl-4 ml-[7px]">
+                                                {waypoints.map((wp, idx) => (
+                                                    <WaypointRow
+                                                        key={wp.id}
+                                                        index={idx}
+                                                        total={waypoints.length}
+                                                        waypoint={wp}
+                                                        onChange={(text) => updateWaypointText(wp.id, text)}
+                                                        onSelect={(place) => selectWaypointPlace(wp.id, place)}
+                                                        onRemove={() => removeWaypoint(wp.id)}
+                                                        onMoveUp={() => moveWaypoint(wp.id, -1)}
+                                                        onMoveDown={() => moveWaypoint(wp.id, 1)}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {waypoints.length < MAX_WAYPOINTS && (
+                                            <div className="mt-3">
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={addWaypoint}
+                                                    className="h-8 gap-1.5 px-2 text-xs font-medium text-primary hover:bg-primary/5"
+                                                >
+                                                    <Plus className="h-3.5 w-3.5" />
+                                                    Add Stop
+                                                    <span className="text-[11px] text-muted-foreground">
+                                                        ({waypoints.length}/{MAX_WAYPOINTS})
+                                                    </span>
+                                                </Button>
+                                            </div>
+                                        )}
+
+                                        <div className="my-3 ml-2 h-4 w-px bg-border" />
+
                                         <div className="flex items-start gap-2">
                                             <MapPin className="mt-0.5 h-4 w-4 text-rose-600" />
                                             <div className="min-w-0 flex-1">
@@ -541,6 +703,14 @@ export default function TripPlanner() {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {(hasEmptyWaypoint || duplicateLocationExists) && (
+                                        <div className="-mt-2 rounded-lg border border-amber-300 bg-amber-50/80 px-3 py-2 text-xs text-amber-800">
+                                            {hasEmptyWaypoint
+                                                ? "Pick a suggestion from the dropdown for each stop, or remove any empty stop."
+                                                : "One or more locations are identical. Please use different places for each stop."}
+                                        </div>
+                                    )}
 
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                                         <Field label="Vehicle Range (km)" icon={<Battery className="h-3.5 w-3.5 text-primary" />}>
@@ -597,7 +767,7 @@ export default function TripPlanner() {
                                         </Button>
                                     </div>
 
-                                    <Button type="submit" className="h-12 w-full gap-2 text-base font-semibold" disabled={loading || !originCoords || !destinationCoords}>
+                                    <Button type="submit" className="h-12 w-full gap-2 text-base font-semibold" disabled={!canSubmit}>
                                         {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
                                         {loading ? "Planning your route..." : "Plan EV Trip"}
                                     </Button>
@@ -629,6 +799,7 @@ export default function TripPlanner() {
                                         routePath={result.route.routePath}
                                         origin={mapOrigin}
                                         destination={mapDestination}
+                                        waypoints={mapWaypoints}
                                         highlightedStationIds={highlightedStationIds}
                                     />
                                 ) : (
@@ -901,6 +1072,81 @@ function RouteStopCard({ station, index }: { station: RouteStation; index: numbe
                             <CalendarCheck className="h-3 w-3" /> {hasAvailable ? "Pre-Book Slot" : "Unavailable"}
                         </Button>
                     </Link>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function WaypointRow({
+    index,
+    total,
+    waypoint,
+    onChange,
+    onSelect,
+    onRemove,
+    onMoveUp,
+    onMoveDown,
+}: {
+    index: number;
+    total: number;
+    waypoint: Waypoint;
+    onChange: (text: string) => void;
+    onSelect: (place: AutocompletePlace) => void;
+    onRemove: () => void;
+    onMoveUp: () => void;
+    onMoveDown: () => void;
+}) {
+    return (
+        <div className="relative">
+            <div className="flex items-start gap-2">
+                <div className="mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[11px] font-bold text-violet-700 ring-2 ring-white">
+                    {index + 1}
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-muted-foreground">
+                            Stop {index + 1}
+                            <span className="ml-1 text-[10px] font-normal text-muted-foreground/80">
+                                (optional)
+                            </span>
+                        </p>
+                        <div className="flex items-center gap-0.5">
+                            <button
+                                type="button"
+                                onClick={onMoveUp}
+                                disabled={index === 0}
+                                aria-label="Move stop up"
+                                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
+                            >
+                                <ArrowUp className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onMoveDown}
+                                disabled={index === total - 1}
+                                aria-label="Move stop down"
+                                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
+                            >
+                                <ArrowDown className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onRemove}
+                                aria-label="Remove stop"
+                                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                    <PlaceAutocomplete
+                        value={waypoint.text}
+                        placeholder={`e.g. waypoint ${index + 1} location`}
+                        resolved={!!waypoint.coords}
+                        onChange={onChange}
+                        onSelect={onSelect}
+                    />
                 </div>
             </div>
         </div>

@@ -9,6 +9,7 @@ type RoutePoint = { lat: number; lng: number };
 interface TripPlanRequestBody {
     origin: RoutePoint;
     destination: RoutePoint;
+    waypoints?: RoutePoint[];
     vehicleRangeKm: number;
     chargerType?: string;
     corridorKm?: number;
@@ -121,8 +122,13 @@ function getClosestPointIndex(point: RoutePoint, routePoints: RoutePoint[]) {
     return index;
 }
 
-async function fetchRouteFromOsrm(origin: RoutePoint, destination: RoutePoint) {
-    const url = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson&steps=false`;
+async function fetchRouteFromOsrm(points: RoutePoint[]) {
+    if (points.length < 2) {
+        throw new Error("At least two coordinates are required for routing.");
+    }
+
+    const coordinateString = points.map((p) => `${p.lng},${p.lat}`).join(";");
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordinateString}?overview=full&geometries=geojson&steps=false`;
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
         throw new Error("Failed to fetch route from OpenStreetMap routing service.");
@@ -131,7 +137,7 @@ async function fetchRouteFromOsrm(origin: RoutePoint, destination: RoutePoint) {
     const data = await response.json();
     const route = data?.routes?.[0];
     if (!route?.geometry?.coordinates?.length) {
-        throw new Error("No route found for this origin and destination.");
+        throw new Error("No route found for the provided locations.");
     }
 
     const routePath: RoutePoint[] = route.geometry.coordinates.map(
@@ -148,7 +154,7 @@ async function fetchRouteFromOsrm(origin: RoutePoint, destination: RoutePoint) {
 export async function POST(request: Request) {
     try {
         const body = (await request.json()) as TripPlanRequestBody;
-        const { origin, destination, vehicleRangeKm, chargerType, corridorKm = 7 } = body;
+        const { origin, destination, waypoints = [], vehicleRangeKm, chargerType, corridorKm = 7 } = body;
 
         if (!origin || !destination) {
             return NextResponse.json({ error: "Origin and destination are required." }, { status: 400 });
@@ -157,7 +163,21 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Vehicle range must be greater than 0." }, { status: 400 });
         }
 
-        const { routePath, distanceKm, durationMinutes } = await fetchRouteFromOsrm(origin, destination);
+        const sanitizedWaypoints = waypoints
+            .filter((wp): wp is RoutePoint =>
+                !!wp && Number.isFinite(wp.lat) && Number.isFinite(wp.lng)
+            )
+            .slice(0, 3);
+
+        if (sanitizedWaypoints.length !== waypoints.length) {
+            return NextResponse.json(
+                { error: "Each stop must have a valid location selected from suggestions." },
+                { status: 400 }
+            );
+        }
+
+        const routePoints: RoutePoint[] = [origin, ...sanitizedWaypoints, destination];
+        const { routePath, distanceKm, durationMinutes } = await fetchRouteFromOsrm(routePoints);
 
         await dbConnect();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -26,6 +26,7 @@ interface MapViewProps {
     routePath?: MapRoutePoint[];
     origin?: MapPointWithLabel;
     destination?: MapPointWithLabel;
+    waypoints?: MapPointWithLabel[];
     highlightedStationIds?: string[];
     className?: string;
 }

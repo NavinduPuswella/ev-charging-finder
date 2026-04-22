@@ -21,6 +21,7 @@ interface MapViewLeafletProps {
     routePath?: MapRoutePoint[];
     origin?: MapPointWithLabel;
     destination?: MapPointWithLabel;
+    waypoints?: MapPointWithLabel[];
     highlightedStationIds?: string[];
     className?: string;
 }
@@ -55,6 +56,15 @@ const destinationIcon = new L.DivIcon({
     iconAnchor: [13, 13],
 });
 
+function createWaypointIcon(label: string) {
+    return new L.DivIcon({
+        html: `<div style="background:#7c3aed;color:white;border-radius:999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid white;box-shadow:0 4px 10px rgba(124,58,237,.45);">${label}</div>`,
+        className: "",
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+    });
+}
+
 function getStatusColor(status?: Availability) {
     if (status === "Available") return "#16a34a";
     if (status === "Limited Availability") return "#d97706";
@@ -85,6 +95,7 @@ export default function MapViewLeaflet({
     routePath = [],
     origin,
     destination,
+    waypoints = [],
     highlightedStationIds = [],
     className = "",
 }: MapViewLeafletProps) {
@@ -124,9 +135,12 @@ export default function MapViewLeaflet({
 
         if (origin) points.push([origin.lat, origin.lng]);
         if (destination) points.push([destination.lat, destination.lng]);
+        for (const waypoint of waypoints) {
+            points.push([waypoint.lat, waypoint.lng]);
+        }
 
         return points;
-    }, [routePath, validStations, origin, destination]);
+    }, [routePath, validStations, origin, destination, waypoints]);
 
     return (
         <div className={`relative isolate overflow-hidden rounded-xl border border-border ${className}`}>
@@ -155,6 +169,20 @@ export default function MapViewLeaflet({
                         </Popup>
                     </Marker>
                 )}
+
+                {waypoints.map((waypoint, idx) => (
+                    <Marker
+                        key={`waypoint-${idx}-${waypoint.lat}-${waypoint.lng}`}
+                        position={[waypoint.lat, waypoint.lng]}
+                        icon={createWaypointIcon(String(idx + 1))}
+                    >
+                        <Popup>
+                            <div className="text-sm font-medium">
+                                {waypoint.label || `Stop ${idx + 1}`}
+                            </div>
+                        </Popup>
+                    </Marker>
+                ))}
 
                 {validStations.map((station) => {
                     const isHighlighted = highlightedStationIds.includes(station._id);
