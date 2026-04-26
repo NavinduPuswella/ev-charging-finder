@@ -2,6 +2,7 @@
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import MapView, { type MapPointWithLabel } from "@/components/map-view";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,15 @@ import {
 
 const CHARGER_TYPES = ["CCS", "CHAdeMO", "Type1", "Type2", "Tesla"];
 const MAX_WAYPOINTS = 3;
+const DEFAULT_RANGE_KM = 250;
+
+type SavedVehicle = {
+    _id: string;
+    brand?: string;
+    model: string;
+    rangeKm: number;
+    isPrimary?: boolean;
+};
 
 interface Coordinates {
     lat: number;
@@ -387,12 +397,16 @@ function PlaceAutocomplete({
 }
 
 export default function TripPlanner() {
+    const { isLoaded: authLoaded, isSignedIn } = useUser();
     const [originText, setOriginText] = useState("");
     const [destinationText, setDestinationText] = useState("");
     const [originCoords, setOriginCoords] = useState<Coordinates | null>(null);
     const [destinationCoords, setDestinationCoords] = useState<Coordinates | null>(null);
     const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
-    const [vehicleRange, setVehicleRange] = useState("250");
+    const [savedVehicles, setSavedVehicles] = useState<SavedVehicle[]>([]);
+    const [noPrimaryPick, setNoPrimaryPick] = useState<string | null>(null);
+    const rangeEditedByUser = useRef(false);
+    const [vehicleRange, setVehicleRange] = useState(String(DEFAULT_RANGE_KM));
     const [chargerType, setChargerType] = useState("any");
     const [corridorKm, setCorridorKm] = useState("7");
     const [loading, setLoading] = useState(false);
@@ -400,6 +414,79 @@ export default function TripPlanner() {
     const [result, setResult] = useState<TripPlanResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [geoLoading, setGeoLoading] = useState(false);
+
+    const loadSavedVehicles = useCallback(async () => {
+        const res = await fetch("/api/vehicles", { credentials: "include" });
+        if (!res.ok) {
+            setSavedVehicles([]);
+            return;
+        }
+        const data = await res.json();
+        setSavedVehicles(data.vehicles ?? []);
+    }, []);
+
+    useEffect(() => {
+        if (!authLoaded) return;
+        if (!isSignedIn) {
+            setSavedVehicles([]);
+            setNoPrimaryPick(null);
+            rangeEditedByUser.current = false;
+            setVehicleRange(String(DEFAULT_RANGE_KM));
+            return;
+        }
+        void loadSavedVehicles();
+    }, [authLoaded, isSignedIn, loadSavedVehicles]);
+
+    useEffect(() => {
+        if (!isSignedIn) return;
+        const onVis = () => {
+            if (document.visibilityState === "visible") void loadSavedVehicles();
+        };
+        document.addEventListener("visibilitychange", onVis);
+        return () => document.removeEventListener("visibilitychange", onVis);
+    }, [isSignedIn, loadSavedVehicles]);
+
+    const plannerContext = useMemo(() => {
+        if (!authLoaded || !isSignedIn || savedVehicles.length === 0) {
+            return null;
+        }
+        const primary = savedVehicles.find((v) => v.isPrimary);
+        if (primary) {
+            return { vehicle: primary, source: "primary" as const };
+        }
+        if (savedVehicles.length === 1) {
+            return { vehicle: savedVehicles[0], source: "single-saved" as const };
+        }
+        const id = noPrimaryPick ?? savedVehicles[0]._id;
+        const v =
+            savedVehicles.find((x) => x._id === id) ?? savedVehicles[0];
+        return { vehicle: v, source: "no-primary-choice" as const };
+    }, [authLoaded, isSignedIn, savedVehicles, noPrimaryPick]);
+
+    useEffect(() => {
+        if (savedVehicles.length === 0) return;
+        if (savedVehicles.some((v) => v.isPrimary) && noPrimaryPick !== null) {
+            setNoPrimaryPick(null);
+        }
+    }, [savedVehicles, noPrimaryPick]);
+
+    useEffect(() => {
+        if (noPrimaryPick && !savedVehicles.some((v) => v._id === noPrimaryPick)) {
+            setNoPrimaryPick(null);
+        }
+    }, [savedVehicles, noPrimaryPick]);
+
+    useEffect(() => {
+        if (!authLoaded) return;
+        if (rangeEditedByUser.current) return;
+        if (!plannerContext) {
+            if (isSignedIn) {
+                setVehicleRange(String(DEFAULT_RANGE_KM));
+            }
+            return;
+        }
+        setVehicleRange(String(plannerContext.vehicle.rangeKm));
+    }, [plannerContext, isSignedIn, authLoaded, savedVehicles.length]);
 
     const addWaypoint = useCallback(() => {
         setWaypoints((current) => {
@@ -523,7 +610,7 @@ export default function TripPlanner() {
                     waypoints: waypoints
                         .map((wp) => wp.coords)
                         .filter((c): c is Coordinates => !!c),
-                    vehicleRangeKm: parseInt(vehicleRange, 10) || 250,
+                    vehicleRangeKm: parseInt(vehicleRange, 10) || DEFAULT_RANGE_KM,
                     chargerType: chargerType === "any" ? undefined : chargerType,
                     corridorKm: parseFloat(corridorKm) || 7,
                 }),
@@ -599,8 +686,11 @@ export default function TripPlanner() {
                     </div>
                     <div className="grid w-full max-w-md grid-cols-3 gap-3">
                         <HeaderMetric label="Connector types" value={`${CHARGER_TYPES.length}`} />
-                        <HeaderMetric label="Range default" value="250 km" />
-                        <HeaderMetric label="Corridor" value="7 km" />
+                        <HeaderMetric
+                            label="Planning range"
+                            value={`${Math.max(1, parseInt(vehicleRange, 10) || DEFAULT_RANGE_KM)} km`}
+                        />
+                        <HeaderMetric label="Corridor" value={`${corridorKm} km`} />
                     </div>
                 </div>
             </section>
@@ -713,15 +803,113 @@ export default function TripPlanner() {
                                     )}
 
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                                        <Field label="Vehicle Range (km)" icon={<Battery className="h-3.5 w-3.5 text-primary" />}>
-                                            <Input
-                                                type="number"
-                                                placeholder="250"
-                                                value={vehicleRange}
-                                                onChange={(e) => setVehicleRange(e.target.value)}
-                                                className="h-11"
-                                            />
-                                        </Field>
+                                        <div className="sm:col-span-2 space-y-2">
+                                            <Field
+                                                label="Vehicle Range (km)"
+                                                icon={<Battery className="h-3.5 w-3.5 text-primary" />}
+                                            >
+                                                <Input
+                                                    type="number"
+                                                    min={1}
+                                                    placeholder={String(DEFAULT_RANGE_KM)}
+                                                    value={vehicleRange}
+                                                    onChange={(e) => {
+                                                        rangeEditedByUser.current = true;
+                                                        setVehicleRange(e.target.value);
+                                                    }}
+                                                    className="h-11"
+                                                />
+                                            </Field>
+                                            {plannerContext && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {plannerContext.source === "primary" && (
+                                                        <>
+                                                            Using primary vehicle:{" "}
+                                                            <span className="font-medium text-foreground">
+                                                                {plannerContext.vehicle.brand
+                                                                    ? `${plannerContext.vehicle.brand} ${plannerContext.vehicle.model}`
+                                                                    : plannerContext.vehicle.model}{" "}
+                                                                ({plannerContext.vehicle.rangeKm} km)
+                                                            </span>
+                                                        </>
+                                                    )}
+                                                    {plannerContext.source === "single-saved" && (
+                                                        <>
+                                                            No primary set — using your saved vehicle:{" "}
+                                                            <span className="font-medium text-foreground">
+                                                                {plannerContext.vehicle.brand
+                                                                    ? `${plannerContext.vehicle.brand} ${plannerContext.vehicle.model}`
+                                                                    : plannerContext.vehicle.model}{" "}
+                                                                ({plannerContext.vehicle.rangeKm} km)
+                                                            </span>
+                                                            .{" "}
+                                                            <Link
+                                                                href="/dashboard/vehicles"
+                                                                className="text-primary underline-offset-2 hover:underline"
+                                                            >
+                                                                Set a primary
+                                                            </Link>
+                                                        </>
+                                                    )}
+                                                    {plannerContext.source === "no-primary-choice" && (
+                                                        <>
+                                                            No primary — choose a saved vehicle for this trip or{" "}
+                                                            <Link
+                                                                href="/dashboard/vehicles"
+                                                                className="text-primary underline-offset-2 hover:underline"
+                                                            >
+                                                                set a primary
+                                                            </Link>
+                                                            .
+                                                        </>
+                                                    )}
+                                                </p>
+                                            )}
+                                            {authLoaded &&
+                                                isSignedIn &&
+                                                savedVehicles.length > 0 &&
+                                                !savedVehicles.some((v) => v.isPrimary) &&
+                                                savedVehicles.length > 1 && (
+                                                    <div className="pt-0.5">
+                                                        <Label className="text-xs text-muted-foreground">
+                                                            Vehicle for this trip
+                                                        </Label>
+                                                        <Select
+                                                            value={noPrimaryPick ?? savedVehicles[0]?._id}
+                                                            onValueChange={(v) => {
+                                                                rangeEditedByUser.current = false;
+                                                                setNoPrimaryPick(v);
+                                                                const pick = savedVehicles.find((x) => x._id === v);
+                                                                if (pick) setVehicleRange(String(pick.rangeKm));
+                                                            }}
+                                                        >
+                                                            <SelectTrigger className="mt-1.5 h-9 text-sm">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {savedVehicles.map((v) => (
+                                                                    <SelectItem key={v._id} value={v._id}>
+                                                                        {v.brand ? `${v.brand} ${v.model}` : v.model} (
+                                                                        {v.rangeKm} km)
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                )}
+                                            {authLoaded && isSignedIn && savedVehicles.length === 0 && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    No saved vehicle — using default {DEFAULT_RANGE_KM} km.{" "}
+                                                    <Link
+                                                        href="/dashboard/vehicles"
+                                                        className="text-primary underline-offset-2 hover:underline"
+                                                    >
+                                                        Add a vehicle
+                                                    </Link>{" "}
+                                                    for a personalized default.
+                                                </p>
+                                            )}
+                                        </div>
 
                                         <Field label="Route Corridor (km)" icon={<Map className="h-3.5 w-3.5 text-primary" />}>
                                             <Input

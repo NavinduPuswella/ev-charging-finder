@@ -14,6 +14,7 @@ export interface IVehicle {
     chargingSpeedKw?: number;
     supportedConnectors: ConnectorType[];
     isKnownModel: boolean;
+    isPrimary: boolean;
 }
 
 const VehicleSchema = new Schema(
@@ -68,6 +69,10 @@ const VehicleSchema = new Schema(
             default: [],
         },
         isKnownModel: {
+            type: Boolean,
+            default: false,
+        },
+        isPrimary: {
             type: Boolean,
             default: false,
         },

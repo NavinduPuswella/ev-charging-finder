@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import dbConnect from "@/lib/db";
 import Vehicle from "@/models/Vehicle";
 import { getAuthUser } from "@/lib/auth";
@@ -12,8 +13,18 @@ export async function GET() {
         }
 
         await dbConnect();
-        const vehicles = await Vehicle.find({ userId: user.userId });
-        return NextResponse.json({ vehicles });
+        const userOid = new mongoose.Types.ObjectId(user.userId);
+        const vehicles = await Vehicle.find({ userId: userOid })
+            .sort({ isPrimary: -1, createdAt: -1 })
+            .lean();
+        return NextResponse.json({
+            vehicles: vehicles.map((v) => ({
+                ...v,
+                _id: v._id.toString(),
+                userId: v.userId.toString(),
+                isPrimary: Boolean(v.isPrimary),
+            })),
+        });
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Server error";
         return NextResponse.json({ error: message }, { status: 500 });
@@ -54,12 +65,26 @@ export async function POST(request: Request) {
             );
         }
 
+        const userOid = new mongoose.Types.ObjectId(user.userId);
+        const existingCount = await Vehicle.countDocuments({ userId: userOid });
+
         const vehicle = await Vehicle.create({
             ...validation.normalized,
-            userId: user.userId,
+            userId: userOid,
+            isPrimary: existingCount === 0,
         });
 
-        return NextResponse.json({ vehicle }, { status: 201 });
+        return NextResponse.json(
+            {
+                vehicle: {
+                    ...vehicle.toObject(),
+                    _id: vehicle._id.toString(),
+                    userId: vehicle.userId.toString(),
+                    isPrimary: Boolean(vehicle.isPrimary),
+                },
+            },
+            { status: 201 }
+        );
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Server error";
         return NextResponse.json({ error: message }, { status: 500 });

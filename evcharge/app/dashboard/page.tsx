@@ -20,14 +20,20 @@ import {
     CreditCard,
     Moon,
     Sun,
+    CheckCircle2,
+    XCircle,
+    Sparkles,
+    Star,
 } from "lucide-react";
 
 interface Vehicle {
     _id: string;
+    brand?: string;
     model: string;
     batteryCapacity: number;
     rangeKm: number;
     chargingType: string;
+    isPrimary?: boolean;
 }
 
 interface Booking {
@@ -41,7 +47,9 @@ interface Booking {
     amount: number;
     stationName?: string;
     city?: string;
-    stationId?: { name: string; city: string; pricePerKwh: number } | string | null;
+    stationId?: { _id?: string; name: string; city: string; pricePerKwh: number } | string | null;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 function getGreeting() {
@@ -51,11 +59,27 @@ function getGreeting() {
     return "Good evening";
 }
 
-const statusConfig: Record<string, { variant: "default" | "destructive" | "secondary" }> = {
-    CONFIRMED: { variant: "default" },
-    COMPLETED: { variant: "secondary" },
-    CANCELLED: { variant: "destructive" },
-    PENDING: { variant: "secondary" },
+const statusBadge: Record<string, { label: string; cls: string }> = {
+    CONFIRMED: {
+        label: "Confirmed",
+        cls: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20",
+    },
+    COMPLETED: {
+        label: "Completed",
+        cls: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/20",
+    },
+    CANCELLED: {
+        label: "Cancelled",
+        cls: "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/20",
+    },
+    PENDING_PAYMENT: {
+        label: "Pending Payment",
+        cls: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20",
+    },
+    PENDING: {
+        label: "Pending",
+        cls: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20",
+    },
 };
 
 export default function DashboardPage() {
@@ -90,26 +114,35 @@ export default function DashboardPage() {
         const completed = bookings.filter((b) => b.status === "COMPLETED").length;
         const cancelled = bookings.filter((b) => b.status === "CANCELLED").length;
         const totalSpent = bookings
+            .filter((b) => b.status !== "CANCELLED")
             .reduce((sum, b) => sum + b.amount, 0);
         return { confirmed, completed, cancelled, totalSpent };
     }, [bookings]);
 
-    const handleCancelBooking = async (id: string) => {
-        try {
-            await fetch(`/api/bookings/${id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "CANCELLED" }),
-            });
-            setBookings((prev) =>
-                prev.map((b) =>
-                    b._id === id ? { ...b, status: "CANCELLED" } : b
-                )
-            );
-        } catch (err) {
-            console.error(err);
-        }
-    };
+    const upcomingBooking = useMemo(() => {
+        const now = Date.now();
+        return bookings
+            .filter(
+                (b) =>
+                    b.status === "CONFIRMED" &&
+                    new Date(b.startTime).getTime() > now
+            )
+            .sort(
+                (a, b) =>
+                    new Date(a.startTime).getTime() -
+                    new Date(b.startTime).getTime()
+            )[0];
+    }, [bookings]);
+
+    const recentActivity = useMemo(() => {
+        return [...bookings]
+            .sort((a, b) => {
+                const at = new Date(a.updatedAt || a.createdAt || a.startTime).getTime();
+                const bt = new Date(b.updatedAt || b.createdAt || b.startTime).getTime();
+                return bt - at;
+            })
+            .slice(0, 4);
+    }, [bookings]);
 
     if (loading) {
         return (
@@ -126,13 +159,13 @@ export default function DashboardPage() {
     }
 
     const firstName = user?.name?.split(" ")[0] || "there";
-    const recentBookings = bookings.slice(0, 4);
 
     return (
         <div className="space-y-8 max-w-[1400px] mx-auto">
             {/* Hero Greeting */}
-            <div className="rounded-2xl border bg-card p-8 animate-fade-in">
-                <div>
+            <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-card via-card to-primary/[0.04] p-8 animate-fade-in">
+                <div className="absolute -top-24 -right-16 h-64 w-64 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+                <div className="relative">
                     <div className="flex items-start justify-between gap-4">
                         <span className="text-sm font-medium text-muted-foreground">{getGreeting()}</span>
                         {themeReady && (
@@ -146,7 +179,9 @@ export default function DashboardPage() {
                     <p className="mt-2 text-muted-foreground max-w-md">
                         {bookings.length === 0
                             ? "Welcome to your EV charging hub. Start by finding a station near you."
-                            : `You have ${stats.confirmed} active booking${stats.confirmed !== 1 ? "s" : ""}. Here's your charging overview.`}
+                            : upcomingBooking
+                                ? `You have an upcoming session at ${upcomingBooking.stationName || "your station"}. Stay charged.`
+                                : `You have ${stats.confirmed} active booking${stats.confirmed !== 1 ? "s" : ""}. Here's your charging overview.`}
                     </p>
                     <div className="mt-6 flex flex-wrap gap-3">
                         <Link href="/stations">
@@ -163,6 +198,23 @@ export default function DashboardPage() {
                         </Link>
                     </div>
                 </div>
+            </div>
+
+            {/* Upcoming Booking */}
+            <div className="animate-fade-in" style={{ animationDelay: "0.05s" }}>
+                <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-lg font-semibold">Upcoming Booking</h2>
+                    <Link href="/dashboard/bookings">
+                        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground gap-1">
+                            All Bookings <ChevronRight className="h-4 w-4" />
+                        </Button>
+                    </Link>
+                </div>
+                {upcomingBooking ? (
+                    <UpcomingBookingCard booking={upcomingBooking} />
+                ) : (
+                    <UpcomingEmpty />
+                )}
             </div>
 
             {/* Stat Cards */}
@@ -196,7 +248,7 @@ export default function DashboardPage() {
 
             {/* Main Content Grid */}
             <div className="grid gap-6 lg:grid-cols-3 animate-fade-in" style={{ animationDelay: "0.2s" }}>
-                {/* Recent Bookings */}
+                {/* Recent Activity */}
                 <div className="lg:col-span-2 space-y-4">
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-semibold">Recent Activity</h2>
@@ -209,28 +261,20 @@ export default function DashboardPage() {
                         )}
                     </div>
 
-                    {recentBookings.length === 0 ? (
-                        <Card className="border-dashed">
-                            <CardContent className="flex flex-col items-center justify-center py-16">
-                                <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-                                    <CalendarCheck className="h-8 w-8 text-muted-foreground/40" />
-                                </div>
-                                <p className="font-medium text-muted-foreground mb-1">No bookings yet</p>
-                                <p className="text-sm text-muted-foreground/70 mb-5">Find a station to make your first booking</p>
-                                <Link href="/stations">
-                                    <Button size="sm">
-                                        <MapPin className="h-4 w-4" /> Browse Stations
-                                    </Button>
-                                </Link>
-                            </CardContent>
-                        </Card>
+                    {recentActivity.length === 0 ? (
+                        <EmptyState
+                            icon={CalendarCheck}
+                            title="No activity yet"
+                            description="Book a charging session to see it appear here."
+                            actionLabel="Browse Stations"
+                            actionHref="/stations"
+                        />
                     ) : (
-                        <div className="space-y-3">
-                            {recentBookings.map((booking, idx) => (
-                                <BookingRow
+                        <div className="space-y-2.5">
+                            {recentActivity.map((booking, idx) => (
+                                <ActivityRow
                                     key={booking._id}
                                     booking={booking}
-                                    onCancel={handleCancelBooking}
                                     style={{ animationDelay: `${0.05 * idx}s` }}
                                 />
                             ))}
@@ -254,7 +298,7 @@ export default function DashboardPage() {
                                 href="/trip-planner"
                                 icon={Route}
                                 label="Plan Trip"
-                                desc="AI-powered stops"
+                                desc="Smart stops"
                             />
                             <QuickAction
                                 href="/dashboard/vehicles"
@@ -283,7 +327,7 @@ export default function DashboardPage() {
                         </div>
                         {vehicles.length === 0 ? (
                             <Card className="border-dashed">
-                                <CardContent className="flex flex-col items-center py-8">
+                                <CardContent className="flex flex-col items-center py-8 text-center">
                                     <Car className="h-8 w-8 text-muted-foreground/30 mb-2" />
                                     <p className="text-sm text-muted-foreground mb-3">No vehicles yet</p>
                                     <Link href="/dashboard/vehicles">
@@ -295,8 +339,8 @@ export default function DashboardPage() {
                             </Card>
                         ) : (
                             <div className="space-y-2">
-                                {vehicles.map((v) => (
-                                    <VehicleCard key={v._id} vehicle={v} />
+                                {vehicles.slice(0, 3).map((v) => (
+                                    <VehicleMini key={v._id} vehicle={v} />
                                 ))}
                             </div>
                         )}
@@ -307,26 +351,34 @@ export default function DashboardPage() {
             {/* Booking Summary Bar */}
             {bookings.length > 0 && (
                 <div className="animate-fade-in" style={{ animationDelay: "0.3s" }}>
-                    <Card className="bg-muted/40 border-none">
+                    <Card className="border bg-muted/30">
                         <CardContent className="p-5">
                             <div className="flex flex-wrap items-center justify-between gap-4">
-                                <div className="flex items-center gap-3">
-                                    <CalendarCheck className="h-5 w-5 text-muted-foreground" />
-                                    <span className="text-sm font-medium">Booking Summary</span>
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="h-4 w-4 text-primary" />
+                                    <span className="text-sm font-semibold">Booking Summary</span>
                                 </div>
-                                <div className="flex flex-wrap gap-6 text-sm">
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="h-2 w-2 rounded-full bg-foreground/40" />
-                                        {stats.confirmed} Confirmed
-                                    </span>
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="h-2 w-2 rounded-full bg-foreground/40" />
-                                        {stats.completed} Completed
-                                    </span>
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="h-2 w-2 rounded-full bg-foreground/40" />
-                                        {stats.cancelled} Cancelled
-                                    </span>
+                                <div className="grid grid-cols-2 sm:flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                                    <SummaryPill
+                                        dot="bg-foreground/40"
+                                        label="Total"
+                                        value={bookings.length}
+                                    />
+                                    <SummaryPill
+                                        dot="bg-emerald-500"
+                                        label="Completed"
+                                        value={stats.completed}
+                                    />
+                                    <SummaryPill
+                                        dot="bg-rose-500"
+                                        label="Cancelled"
+                                        value={stats.cancelled}
+                                    />
+                                    <SummaryPill
+                                        dot="bg-primary"
+                                        label="Spent"
+                                        value={`LKR ${stats.totalSpent.toLocaleString()}`}
+                                    />
                                 </div>
                             </div>
                         </CardContent>
@@ -338,6 +390,16 @@ export default function DashboardPage() {
 }
 
 /* ─── Sub Components ─── */
+
+function SummaryPill({ dot, label, value }: { dot: string; label: string; value: string | number }) {
+    return (
+        <span className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${dot}`} />
+            <span className="text-muted-foreground">{label}</span>
+            <span className="font-semibold">{value}</span>
+        </span>
+    );
+}
 
 function StatCard({
     icon: Icon,
@@ -361,41 +423,173 @@ function StatCard({
                         <p className={`${isText ? "text-xl" : "text-3xl"} font-bold tracking-tight`}>{value}</p>
                         <p className="text-xs text-muted-foreground/70">{sub}</p>
                     </div>
-                    <Icon className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Icon className="h-4.5 w-4.5" />
+                    </div>
                 </div>
             </CardContent>
         </Card>
     );
 }
 
-function BookingRow({
-    booking,
-    onCancel,
-    style,
-}: {
-    booking: Booking;
-    onCancel: (id: string) => void;
-    style?: React.CSSProperties;
-}) {
+function UpcomingBookingCard({ booking }: { booking: Booking }) {
     const start = new Date(booking.startTime);
     const end = new Date(booking.endTime);
-    const [now] = useState(() => Date.now());
-    const canCancel = booking.status === "CONFIRMED" && start.getTime() > now;
-    const cfg = statusConfig[booking.status] || statusConfig.PENDING;
     const stationObj = booking.stationId && typeof booking.stationId === "object" ? booking.stationId : null;
     const stationName = booking.stationName || stationObj?.name || "Station";
     const city = booking.city || stationObj?.city || "";
+    const badge = statusBadge[booking.status] ?? statusBadge.PENDING;
+
+    const daysUntil = Math.max(
+        0,
+        Math.ceil((start.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    );
+    const countdown =
+        start.getTime() - Date.now() < 1000 * 60 * 60 * 24
+            ? "Starts today"
+            : daysUntil === 1
+                ? "In 1 day"
+                : `In ${daysUntil} days`;
 
     return (
-        <Card className="animate-fade-in transition-all duration-200 hover:shadow-sm" style={style}>
+        <Card className="overflow-hidden border-primary/20 shadow-sm">
+            <div className="h-1 bg-gradient-to-r from-primary via-primary/70 to-primary/30" />
+            <CardContent className="p-6">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-start gap-4 min-w-0">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <Zap className="h-6 w-6" />
+                        </div>
+                        <div className="min-w-0 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-base font-semibold truncate">{stationName}</p>
+                                <span
+                                    className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${badge.cls}`}
+                                >
+                                    {badge.label}
+                                </span>
+                                <span className="rounded-full border bg-primary/5 px-2 py-0.5 text-[11px] font-medium text-primary">
+                                    {countdown}
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                {city && (
+                                    <span className="flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" /> {city}
+                                    </span>
+                                )}
+                                <span className="flex items-center gap-1">
+                                    <CalendarCheck className="h-3 w-3" />
+                                    {start.toLocaleDateString([], {
+                                        weekday: "short",
+                                        month: "short",
+                                        day: "numeric",
+                                    })}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                    {" – "}
+                                    {end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 lg:justify-end">
+                        <div className="text-right">
+                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Amount</p>
+                            <p className="text-lg font-bold">LKR {booking.amount.toLocaleString()}</p>
+                        </div>
+                        <Link href="/dashboard/bookings">
+                            <Button size="sm" className="gap-1">
+                                View Booking
+                                <ArrowRight className="h-4 w-4" />
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function UpcomingEmpty() {
+    return (
+        <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center gap-4 py-10 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                    <CalendarCheck className="h-7 w-7 text-primary" />
+                </div>
+                <div className="space-y-1">
+                    <p className="font-semibold">No upcoming bookings</p>
+                    <p className="text-sm text-muted-foreground">
+                        Reserve a charging slot or plan a trip to get started.
+                    </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Link href="/stations">
+                        <Button size="sm">
+                            <MapPin className="h-4 w-4" /> Find Stations
+                        </Button>
+                    </Link>
+                    <Link href="/trip-planner">
+                        <Button size="sm" variant="outline">
+                            <Route className="h-4 w-4" /> Plan Trip
+                        </Button>
+                    </Link>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function ActivityRow({
+    booking,
+    style,
+}: {
+    booking: Booking;
+    style?: React.CSSProperties;
+}) {
+    const start = new Date(booking.startTime);
+    const stationObj = booking.stationId && typeof booking.stationId === "object" ? booking.stationId : null;
+    const stationName = booking.stationName || stationObj?.name || "Station";
+    const city = booking.city || stationObj?.city || "";
+    const badge = statusBadge[booking.status] ?? statusBadge.PENDING;
+
+    const icon =
+        booking.status === "COMPLETED"
+            ? CheckCircle2
+            : booking.status === "CANCELLED"
+                ? XCircle
+                : booking.status === "CONFIRMED"
+                    ? Zap
+                    : Clock;
+    const Icon = icon;
+    const iconTone =
+        booking.status === "COMPLETED"
+            ? "text-blue-600 bg-blue-100 dark:text-blue-300 dark:bg-blue-500/10"
+            : booking.status === "CANCELLED"
+                ? "text-rose-600 bg-rose-100 dark:text-rose-300 dark:bg-rose-500/10"
+                : booking.status === "CONFIRMED"
+                    ? "text-emerald-600 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-500/10"
+                    : "text-amber-600 bg-amber-100 dark:text-amber-300 dark:bg-amber-500/10";
+
+    return (
+        <Card
+            className="group animate-fade-in border-border/70 transition-all duration-200 hover:shadow-sm hover:border-border"
+            style={style}
+        >
             <CardContent className="p-4">
                 <div className="flex items-center gap-4">
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconTone}`}>
+                        <Icon className="h-5 w-5" />
+                    </div>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                             <p className="font-semibold text-sm truncate">{stationName}</p>
-                            <Badge variant={cfg.variant} className="text-[10px] px-1.5 py-0">
-                                {booking.status.charAt(0) + booking.status.slice(1).toLowerCase()}
-                            </Badge>
+                            <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${badge.cls}`}>
+                                {badge.label}
+                            </span>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                             {city && (
@@ -408,22 +602,12 @@ function BookingRow({
                             </span>
                             <span className="flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                {start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} - {end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                {start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </span>
                         </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                         <span className="text-sm font-bold">LKR {booking.amount.toLocaleString()}</span>
-                        {canCancel && (
-                            <Button
-                                variant="destructive"
-                                size="sm"
-                                className="h-8 text-xs"
-                                onClick={() => onCancel(booking._id)}
-                            >
-                                Cancel
-                            </Button>
-                        )}
                     </div>
                 </div>
             </CardContent>
@@ -444,10 +628,10 @@ function QuickAction({
 }) {
     return (
         <Link href={href}>
-            <Card className="group cursor-pointer transition-all duration-200 hover:shadow-sm hover:-translate-y-0.5">
+            <Card className="group cursor-pointer transition-all duration-200 hover:shadow-sm hover:-translate-y-0.5 hover:border-primary/30">
                 <CardContent className="flex items-center gap-3 p-3.5">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-muted/30 transition-transform group-hover:scale-110">
-                        <Icon className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-muted/30 transition-transform group-hover:scale-110 group-hover:border-primary/30 group-hover:bg-primary/5 group-hover:text-primary">
+                        <Icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold">{label}</p>
@@ -460,18 +644,26 @@ function QuickAction({
     );
 }
 
-function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
+function VehicleMini({ vehicle }: { vehicle: Vehicle }) {
     const batteryPercent = Math.min(100, Math.round((vehicle.rangeKm / 500) * 100));
+    const displayName = vehicle.brand ? `${vehicle.brand} ${vehicle.model}` : vehicle.model;
 
     return (
-        <Card className="transition-all duration-200 hover:shadow-sm">
+        <Card className={`transition-all duration-200 hover:shadow-sm ${vehicle.isPrimary ? "border-primary/40 bg-primary/[0.02]" : ""}`}>
             <CardContent className="p-4">
                 <div className="flex items-center gap-3 mb-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-muted/30">
                         <Car className="h-4.5 w-4.5 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate">{vehicle.model}</p>
+                        <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-semibold truncate">{displayName}</p>
+                            {vehicle.isPrimary && (
+                                <Badge variant="outline" className="h-4 gap-0.5 border-primary/30 bg-primary/10 px-1.5 py-0 text-[9px] text-primary">
+                                    <Star className="h-2.5 w-2.5 fill-primary" /> Primary
+                                </Badge>
+                            )}
+                        </div>
                         <p className="text-xs text-muted-foreground">{vehicle.chargingType}</p>
                     </div>
                 </div>
@@ -482,11 +674,42 @@ function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
                     </div>
                     <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                         <div
-                            className="h-full rounded-full bg-foreground/60 transition-all duration-700"
+                            className="h-full rounded-full bg-primary/70 transition-all duration-700"
                             style={{ width: `${batteryPercent}%` }}
                         />
                     </div>
                 </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function EmptyState({
+    icon: Icon,
+    title,
+    description,
+    actionLabel,
+    actionHref,
+}: {
+    icon: React.ElementType;
+    title: string;
+    description: string;
+    actionLabel: string;
+    actionHref: string;
+}) {
+    return (
+        <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-14 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted mb-4">
+                    <Icon className="h-7 w-7 text-muted-foreground/60" />
+                </div>
+                <p className="font-semibold mb-1">{title}</p>
+                <p className="text-sm text-muted-foreground mb-5 max-w-sm">{description}</p>
+                <Link href={actionHref}>
+                    <Button size="sm">
+                        <MapPin className="h-4 w-4" /> {actionLabel}
+                    </Button>
+                </Link>
             </CardContent>
         </Card>
     );
