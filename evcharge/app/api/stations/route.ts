@@ -3,6 +3,7 @@ import dbConnect from "@/lib/db";
 import Station from "@/models/Station";
 import { getAuthUser } from "@/lib/auth";
 import { getCurrentOccupancyMap } from "@/lib/booking-availability";
+import { sanitizeDescription, validateDescription } from "@/lib/station-description";
 
 function normalizeChargerTypes(value: unknown) {
     if (Array.isArray(value)) {
@@ -111,12 +112,12 @@ export async function GET(request: Request) {
     }
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[+\d][\d\s-]{6,16}$/;
+
 export async function POST(request: Request) {
     try {
         const user = await getAuthUser();
-        if (!user || (user.role !== "STATION_OWNER" && user.role !== "ADMIN")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-        }
 
         await dbConnect();
         const body = await request.json();
@@ -140,7 +141,8 @@ export async function POST(request: Request) {
             );
         }
 
-        const isAdmin = user.role === "ADMIN";
+        const isAdmin = user?.role === "ADMIN";
+        const isAuthenticated = Boolean(user);
         const chargerTypes = normalizeChargerTypes(body.chargerType);
         if (chargerTypes.length === 0) {
             return NextResponse.json(
@@ -149,26 +151,95 @@ export async function POST(request: Request) {
             );
         }
 
+        const contactPhoneRaw =
+            typeof body.contactPhone === "string" ? body.contactPhone.trim() : "";
+        const submitterNameRaw =
+            typeof body.submitterName === "string" ? body.submitterName.trim() : "";
+        const submitterEmailRaw =
+            typeof body.submitterEmail === "string" ? body.submitterEmail.trim().toLowerCase() : "";
+
+        if (!isAuthenticated) {
+            if (!submitterNameRaw || submitterNameRaw.length < 2) {
+                return NextResponse.json(
+                    { error: "Your name is required (min 2 characters)." },
+                    { status: 400 }
+                );
+            }
+            if (!submitterEmailRaw || !EMAIL_REGEX.test(submitterEmailRaw)) {
+                return NextResponse.json(
+                    { error: "A valid email address is required." },
+                    { status: 400 }
+                );
+            }
+            if (!contactPhoneRaw || !PHONE_REGEX.test(contactPhoneRaw)) {
+                return NextResponse.json(
+                    { error: "A valid contact phone number is required." },
+                    { status: 400 }
+                );
+            }
+        } else if (contactPhoneRaw && !PHONE_REGEX.test(contactPhoneRaw)) {
+            return NextResponse.json(
+                { error: "Contact phone is not a valid number." },
+                { status: 400 }
+            );
+        }
+
+        const descriptionError = validateDescription(body.description);
+        if (descriptionError) {
+            return NextResponse.json({ error: descriptionError }, { status: 400 });
+        }
+        const cleanDescription = sanitizeDescription(body.description) || undefined;
+
+        const reservationFeePerHour =
+            body.reservationFeePerHour !== undefined
+                ? Number(body.reservationFeePerHour)
+                : 100;
+
         const station = await Station.create({
             name: body.name,
             city: body.city,
             address: body.address,
             chargerType: chargerTypes.join(", "),
             pricePerKwh: Number(body.pricePerKwh),
+            reservationFeePerHour,
             totalChargingPoints,
             totalSlots: totalChargingPoints,
             status: body.status || "AVAILABLE",
-            description: body.description,
+            description: cleanDescription,
+            contactPhone: contactPhoneRaw || undefined,
+            submitterName: !isAdmin ? submitterNameRaw || user?.name : undefined,
+            submitterEmail: !isAdmin ? submitterEmailRaw || user?.email : undefined,
             location: {
                 latitude,
                 longitude,
             },
-            ownerId: body.ownerId || user.userId,
+            ownerId: body.ownerId || (user ? user.userId : undefined),
             isApproved: isAdmin ? true : false,
+            submittedAt: isAdmin ? undefined : new Date(),
+            approvedAt: isAdmin ? new Date() : undefined,
+            source: isAdmin
+                ? "admin"
+                : isAuthenticated
+                    ? "owner_submission"
+                    : "guest_submission",
+            requesterName: isAdmin ? undefined : submitterNameRaw || user?.name,
+            requesterEmail: isAdmin ? undefined : submitterEmailRaw || user?.email,
+            requesterPhone: contactPhoneRaw || undefined,
+            requesterUserId: !isAdmin && user ? user.userId : undefined,
+            requesterAccountStatus: isAdmin
+                ? "Admin Added"
+                : isAuthenticated
+                    ? "Registered User"
+                    : "Guest / No Account",
         });
 
         return NextResponse.json(
-            { station, message: isAdmin ? "Station created and approved." : "Station created. Awaiting admin approval." },
+            {
+                station,
+                message: isAdmin
+                    ? "Station created and approved."
+                    : "Submission received. Our admin team will review your station soon.",
+            },
             { status: 201 }
         );
     } catch (error: unknown) {

@@ -45,6 +45,8 @@ interface Booking {
     status: string;
     paymentStatus: string;
     amount: number;
+    reservationFeePerHour?: number;
+    totalReservationFee?: number;
     stationName?: string;
     city?: string;
     stationId?: { _id?: string; name: string; city: string; pricePerKwh: number } | string | null;
@@ -82,6 +84,29 @@ const statusBadge: Record<string, { label: string; cls: string }> = {
     },
 };
 
+const bookingActivityIcon: Record<string, { Icon: React.ElementType; cls: string }> = {
+    COMPLETED: {
+        Icon: CheckCircle2,
+        cls: "text-blue-600 bg-blue-100 dark:text-blue-300 dark:bg-blue-500/10",
+    },
+    CANCELLED: {
+        Icon: XCircle,
+        cls: "text-rose-600 bg-rose-100 dark:text-rose-300 dark:bg-rose-500/10",
+    },
+    CONFIRMED: {
+        Icon: CalendarCheck,
+        cls: "text-emerald-600 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-500/10",
+    },
+    PENDING_PAYMENT: {
+        Icon: Clock,
+        cls: "text-amber-600 bg-amber-100 dark:text-amber-300 dark:bg-amber-500/10",
+    },
+    PENDING: {
+        Icon: Clock,
+        cls: "text-amber-600 bg-amber-100 dark:text-amber-300 dark:bg-amber-500/10",
+    },
+};
+
 export default function DashboardPage() {
     const { user } = useAuthStore();
     const { theme, toggleTheme, themeReady } = useDashboardTheme();
@@ -115,7 +140,7 @@ export default function DashboardPage() {
         const cancelled = bookings.filter((b) => b.status === "CANCELLED").length;
         const totalSpent = bookings
             .filter((b) => b.status !== "CANCELLED")
-            .reduce((sum, b) => sum + b.amount, 0);
+            .reduce((sum, b) => sum + (b.totalReservationFee ?? b.amount), 0);
         return { confirmed, completed, cancelled, totalSpent };
     }, [bookings]);
 
@@ -239,7 +264,7 @@ export default function DashboardPage() {
                 />
                 <StatCard
                     icon={CreditCard}
-                    label="Total Spent"
+                    label="Reservation Fees Paid"
                     value={`LKR ${stats.totalSpent.toLocaleString()}`}
                     sub={`across ${bookings.length} sessions`}
                     isText
@@ -355,7 +380,6 @@ export default function DashboardPage() {
                         <CardContent className="p-5">
                             <div className="flex flex-wrap items-center justify-between gap-4">
                                 <div className="flex items-center gap-2">
-                                    <Sparkles className="h-4 w-4 text-primary" />
                                     <span className="text-sm font-semibold">Booking Summary</span>
                                 </div>
                                 <div className="grid grid-cols-2 sm:flex flex-wrap gap-x-6 gap-y-2 text-sm">
@@ -376,7 +400,7 @@ export default function DashboardPage() {
                                     />
                                     <SummaryPill
                                         dot="bg-primary"
-                                        label="Spent"
+                                        label="Reservation fees"
                                         value={`LKR ${stats.totalSpent.toLocaleString()}`}
                                     />
                                 </div>
@@ -497,8 +521,8 @@ function UpcomingBookingCard({ booking }: { booking: Booking }) {
                     </div>
                     <div className="flex items-center justify-between gap-4 lg:justify-end">
                         <div className="text-right">
-                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Amount</p>
-                            <p className="text-lg font-bold">LKR {booking.amount.toLocaleString()}</p>
+                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Reservation Fee</p>
+                            <p className="text-lg font-bold">LKR {(booking.totalReservationFee ?? booking.amount).toLocaleString()}</p>
                         </div>
                         <Link href="/dashboard/bookings">
                             <Button size="sm" className="gap-1">
@@ -555,24 +579,7 @@ function ActivityRow({
     const stationName = booking.stationName || stationObj?.name || "Station";
     const city = booking.city || stationObj?.city || "";
     const badge = statusBadge[booking.status] ?? statusBadge.PENDING;
-
-    const icon =
-        booking.status === "COMPLETED"
-            ? CheckCircle2
-            : booking.status === "CANCELLED"
-                ? XCircle
-                : booking.status === "CONFIRMED"
-                    ? Zap
-                    : Clock;
-    const Icon = icon;
-    const iconTone =
-        booking.status === "COMPLETED"
-            ? "text-blue-600 bg-blue-100 dark:text-blue-300 dark:bg-blue-500/10"
-            : booking.status === "CANCELLED"
-                ? "text-rose-600 bg-rose-100 dark:text-rose-300 dark:bg-rose-500/10"
-                : booking.status === "CONFIRMED"
-                    ? "text-emerald-600 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-500/10"
-                    : "text-amber-600 bg-amber-100 dark:text-amber-300 dark:bg-amber-500/10";
+    const { Icon, cls: iconTone } = bookingActivityIcon[booking.status] ?? bookingActivityIcon.PENDING;
 
     return (
         <Card
@@ -582,7 +589,7 @@ function ActivityRow({
             <CardContent className="p-4">
                 <div className="flex items-center gap-4">
                     <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconTone}`}>
-                        <Icon className="h-5 w-5" />
+                        <Icon className="h-5 w-5" aria-hidden="true" />
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
@@ -607,7 +614,7 @@ function ActivityRow({
                         </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-sm font-bold">LKR {booking.amount.toLocaleString()}</span>
+                        <span className="text-sm font-bold">LKR {(booking.totalReservationFee ?? booking.amount).toLocaleString()}</span>
                     </div>
                 </div>
             </CardContent>

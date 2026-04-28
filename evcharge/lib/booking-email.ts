@@ -2,6 +2,10 @@ import nodemailer from "nodemailer";
 import type { IBooking } from "@/models/Booking";
 import User from "@/models/User";
 import Station from "@/models/Station";
+import {
+    EMAIL_RESERVATION_NOTE,
+    REFUND_POLICY_LABEL,
+} from "@/lib/pricing";
 
 type MailTransporter = nodemailer.Transporter;
 
@@ -75,7 +79,10 @@ function buildBookingConfirmationHtml(params: {
     startTime: string;
     endTime: string;
     durationHours: number;
-    amount: string;
+    chargingRate: string;
+    reservationFee: string;
+    refundPolicy: string;
+    reservationNote: string;
     mapLink: string;
 }): string {
     const {
@@ -88,7 +95,10 @@ function buildBookingConfirmationHtml(params: {
         startTime,
         endTime,
         durationHours,
-        amount,
+        chargingRate,
+        reservationFee,
+        refundPolicy,
+        reservationNote,
         mapLink,
     } = params;
 
@@ -193,7 +203,8 @@ function buildBookingConfirmationHtml(params: {
                                 ${detailRow("Date", bookingDate)}
                                 ${detailRow("Start Time", startTime)}
                                 ${detailRow("End Time", endTime)}
-                                ${detailRow("Duration", `${durationHours} hour${durationHours === 1 ? "" : "s"}`, true)}
+                                ${detailRow("Duration", `${durationHours} hour${durationHours === 1 ? "" : "s"}`)}
+                                ${detailRow("Charging Rate", chargingRate, true)}
                             </table>
                         </td>
                     </tr>
@@ -210,10 +221,18 @@ function buildBookingConfirmationHtml(params: {
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
                                 <tr>
                                     <td style="padding:6px 0;font-family:${FONT};font-size:13px;color:${MUTED};font-weight:500;">
-                                        Amount Paid
+                                        Reservation Fee Paid
                                     </td>
                                     <td align="right" style="padding:6px 0;font-family:${FONT};font-size:14px;color:${INK_SOFT};font-weight:600;">
-                                        LKR ${amount}
+                                        ${reservationFee}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:6px 0;font-family:${FONT};font-size:13px;color:${MUTED};font-weight:500;">
+                                        Refund Policy
+                                    </td>
+                                    <td align="right" style="padding:6px 0;font-family:${FONT};font-size:13px;color:${INK_SOFT};font-weight:600;">
+                                        ${refundPolicy}
                                     </td>
                                 </tr>
                                 <tr>
@@ -231,13 +250,21 @@ function buildBookingConfirmationHtml(params: {
                                 </tr>
                                 <tr>
                                     <td style="padding:16px 0 0;font-family:${FONT};font-size:15px;color:${INK};font-weight:700;letter-spacing:-0.005em;">
-                                        Total
+                                        Total Paid Online
                                     </td>
                                     <td align="right" style="padding:16px 0 0;font-family:${FONT};font-size:20px;color:${INK};font-weight:800;letter-spacing:-0.015em;">
-                                        LKR ${amount}
+                                        ${reservationFee}
                                     </td>
                                 </tr>
                             </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background-color:#ffffff;padding:18px 24px 6px;">
+                            <div style="border:1px solid #FCE2A4;background-color:#FFF8E1;border-radius:12px;padding:14px 16px;font-family:${FONT};font-size:12.5px;line-height:1.55;color:#8A6D1A;">
+                                <strong style="color:#7A5C0E;">Note:</strong> ${reservationNote}
+                            </div>
                         </td>
                     </tr>
 
@@ -324,7 +351,14 @@ export async function sendBookingConfirmationEmail(booking: IBooking): Promise<v
     const transporter = getMailTransporter();
     const fromAddress = process.env.SMTP_FROM || process.env.GMAIL_SMTP_USER!;
     const bookingId = booking._id.toString();
-    const amount = Number(booking.amount || 0).toFixed(2);
+    const totalReservationFee = Number(booking.totalReservationFee || booking.amount || 0);
+    const reservationFeeFormatted = `LKR ${totalReservationFee.toFixed(2)}`;
+    const feePerHour = Number(booking.reservationFeePerHour || 0);
+    const feePerHourFormatted = feePerHour > 0
+        ? `LKR ${feePerHour} / hour × ${booking.durationHours}h`
+        : reservationFeeFormatted;
+    const chargingRateNumber = Number(booking.pricePerKwh || 0);
+    const chargingRateFormatted = `LKR ${chargingRateNumber} / kWh`;
     const station = await Station.findById(booking.stationId)
         .select("location address")
         .lean<{ location?: { latitude?: number; longitude?: number }; address?: string }>();
@@ -345,8 +379,14 @@ export async function sendBookingConfirmationEmail(booking: IBooking): Promise<v
         `Start: ${formatDateTime(booking.startTime)}`,
         `End: ${formatDateTime(booking.endTime)}`,
         `Duration: ${booking.durationHours} hour(s)`,
-        `Amount Paid: LKR ${amount}`,
+        `Charging Rate: ${chargingRateFormatted}`,
+        `Reservation Fee: ${feePerHourFormatted}`,
+        `Total Reservation Fee Paid: ${reservationFeeFormatted}`,
+        `Refund Policy: ${REFUND_POLICY_LABEL}`,
         "Payment Status: Paid",
+        "",
+        EMAIL_RESERVATION_NOTE,
+        "",
         `Map: ${mapData.mapLink}`,
         "",
         "Thank you for choosing ChargeX.",
@@ -363,7 +403,10 @@ export async function sendBookingConfirmationEmail(booking: IBooking): Promise<v
         startTime: escapeHtml(formatTimeOnly(booking.startTime)),
         endTime: escapeHtml(formatTimeOnly(booking.endTime)),
         durationHours: booking.durationHours,
-        amount: escapeHtml(amount),
+        chargingRate: escapeHtml(chargingRateFormatted),
+        reservationFee: escapeHtml(reservationFeeFormatted),
+        refundPolicy: escapeHtml(REFUND_POLICY_LABEL),
+        reservationNote: escapeHtml(EMAIL_RESERVATION_NOTE),
         mapLink: escapeHtml(mapData.mapLink),
     });
 

@@ -14,7 +14,7 @@ import {
     XCircle,
     ListChecks,
     Star,
-    Activity,
+    History,
     AlertTriangle,
     UserPlus,
     MessageSquare,
@@ -73,6 +73,7 @@ interface Analytics {
         flaggedReviews: number;
         disabledStations: number;
         bookingsNeedingReview: number;
+        pendingSubmissions?: number;
     };
 }
 
@@ -250,6 +251,12 @@ export default function AdminOverview() {
     ];
 
     const pendingActionItems = [
+        {
+            label: "Pending station submissions",
+            count: analytics.pendingActions.pendingSubmissions ?? 0,
+            href: "/admin/submissions",
+            accent: "text-amber-700",
+        },
         {
             label: "Flagged low-rating reviews",
             count: analytics.pendingActions.flaggedReviews,
@@ -468,7 +475,7 @@ export default function AdminOverview() {
                             </p>
                         </div>
                         <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center">
-                            <Activity className="h-5 w-5 text-emerald-600" />
+                            <History className="h-5 w-5 text-emerald-600" aria-hidden="true" />
                         </div>
                     </div>
 
@@ -488,7 +495,7 @@ export default function AdminOverview() {
                                         <div
                                             className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${cls}`}
                                         >
-                                            <Icon className="h-4 w-4" />
+                                            <Icon className="h-4 w-4" aria-hidden="true" />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium text-foreground truncate">

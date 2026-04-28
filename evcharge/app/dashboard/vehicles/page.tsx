@@ -361,7 +361,7 @@ export default function VehiclesPage() {
                                 {!editingId && (
                                     <div className="space-y-2.5 rounded-xl border border-primary/15 bg-primary/5 p-3.5 sm:p-4">
                                         <div className="flex items-center gap-2">
-                                            <Sparkles className="h-4 w-4 text-primary" />
+                                           
                                             <Label className="text-sm font-semibold">
                                                 Search EV Model
                                             </Label>

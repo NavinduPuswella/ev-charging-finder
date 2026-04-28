@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, MapPin, Star, Zap, DollarSign } from "lucide-react";
+import { ArrowRight, MapPin, Star, Zap, Receipt } from "lucide-react";
+import { formatChargingRate } from "@/lib/pricing";
 
 interface StationCardProps {
     station: {
@@ -55,9 +56,9 @@ export default function StationCard({ station, distance }: StationCardProps) {
                         <span className="text-xs text-muted-foreground">Rating</span>
                     </div>
                     <div className="flex flex-col items-center rounded-lg bg-muted/50 p-2">
-                        <DollarSign className="h-4 w-4 text-primary mb-1" />
-                        <span className="text-sm font-semibold">LKR {station.pricePerKwh}</span>
-                        <span className="text-xs text-muted-foreground">Per kWh</span>
+                        <Receipt className="h-4 w-4 text-primary mb-1" />
+                        <span className="text-sm font-semibold">{formatChargingRate(station.pricePerKwh)}</span>
+                        <span className="text-xs text-muted-foreground">Charging Rate</span>
                     </div>
                     <div className="flex flex-col items-center rounded-lg bg-muted/50 p-2">
                         <Zap className="h-4 w-4 text-primary mb-1" />

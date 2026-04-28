@@ -16,8 +16,9 @@ import {
     Route, MapPin, Zap, Star, Navigation, Loader2, Battery,
     Search, CalendarCheck, SearchX, AlertTriangle, Map,
     Clock3, Gauge, Bot, Coins, ArrowRight, CircleDot, SlidersHorizontal,
-    Plus, Trash2, ArrowUp, ArrowDown,
+    Plus, Trash2, ArrowUp, ArrowDown, Receipt,
 } from "lucide-react";
+import { formatChargingRate } from "@/lib/pricing";
 
 const CHARGER_TYPES = ["CCS", "CHAdeMO", "Type1", "Type2", "Tesla"];
 const MAX_WAYPOINTS = 3;
@@ -698,8 +699,8 @@ export default function TripPlanner() {
             <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
                 <div className="grid gap-6 lg:grid-cols-12">
                     <div className="lg:col-span-5 xl:col-span-4">
-                        <Card className="sticky top-24 border bg-white">
-                            <CardContent className="p-5 sm:p-6">
+                        <Card className="border bg-white lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-hidden">
+                            <CardContent className="p-5 sm:p-6 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain">
                                 <div className="mb-5 flex items-start justify-between gap-3">
                                     <div>
                                         <p className="text-base font-semibold text-foreground">Trip setup</p>
@@ -1231,7 +1232,11 @@ function RouteStopCard({ station, index }: { station: RouteStation; index: numbe
                 </div>
 
                 <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <MetricCell label="Price" value={`LKR ${station.pricePerKwh}`} subLabel="per kWh" />
+                    <MetricCell
+                        label="Charging Rate"
+                        value={formatChargingRate(station.pricePerKwh)}
+                        icon={<Receipt className="h-3 w-3 text-primary" />}
+                    />
                     <MetricCell
                         label="Rating"
                         value={station.rating?.toFixed(1) || "—"}
@@ -1244,9 +1249,12 @@ function RouteStopCard({ station, index }: { station: RouteStation; index: numbe
                 <div className="mb-4 rounded-lg border bg-muted/30 p-3">
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Coins className="h-3 w-3" />
-                        Estimated charge cost
+                        Estimated charging cost (paid at station)
                     </p>
                     <p className="mt-1 text-sm font-semibold text-foreground">LKR {station.estimatedChargeCostLkr}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                        Estimate based on the station&apos;s charging rate. Online booking only charges a small reservation fee.
+                    </p>
                 </div>
 
                 <div className="flex gap-2">

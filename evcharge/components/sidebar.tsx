@@ -13,6 +13,8 @@ import {
     ShieldCheck,
     BookOpen,
     Star,
+    Inbox,
+    History,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -35,6 +37,8 @@ const menuItems = {
     ADMIN: [
         { href: "/admin", label: "Overview", icon: LayoutDashboard },
         { href: "/admin/stations", label: "Stations", icon: ShieldCheck },
+        { href: "/admin/added-stations", label: "Added Stations", icon: History },
+        { href: "/admin/submissions", label: "Submissions", icon: Inbox },
         { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck },
         { href: "/admin/users", label: "Users", icon: Users },
         { href: "/admin/reviews", label: "Reviews", icon: Star },

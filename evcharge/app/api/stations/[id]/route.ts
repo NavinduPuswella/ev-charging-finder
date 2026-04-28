@@ -4,6 +4,7 @@ import Station from "@/models/Station";
 import Review from "@/models/Review";
 import { getAuthUser } from "@/lib/auth";
 import { getCurrentOccupancyForStation } from "@/lib/booking-availability";
+import { sanitizeDescription, validateDescription } from "@/lib/station-description";
 
 function normalizeChargerTypes(value: unknown) {
     if (Array.isArray(value)) {
@@ -118,9 +119,21 @@ export async function PUT(
         if (body.name !== undefined) updateData.name = body.name;
         if (body.address !== undefined) updateData.address = body.address;
         if (body.city !== undefined) updateData.city = body.city;
-        if (body.description !== undefined) updateData.description = body.description;
+        if (body.description !== undefined) {
+            const descriptionError = validateDescription(body.description);
+            if (descriptionError) {
+                return NextResponse.json({ error: descriptionError }, { status: 400 });
+            }
+            updateData.description = sanitizeDescription(body.description);
+        }
         if (body.status !== undefined) updateData.status = body.status;
         if (body.pricePerKwh !== undefined) updateData.pricePerKwh = Number(body.pricePerKwh);
+        if (body.reservationFeePerHour !== undefined) {
+            const fee = Number(body.reservationFeePerHour);
+            if (Number.isFinite(fee) && fee >= 0) {
+                updateData.reservationFeePerHour = fee;
+            }
+        }
         if (chargerTypes) updateData.chargerType = chargerTypes.join(", ");
         if (Number.isFinite(totalChargingPoints)) {
             updateData.totalChargingPoints = totalChargingPoints;

@@ -24,8 +24,16 @@ import {
     CheckCircle2,
     XCircle,
     Info,
+    Receipt,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+    REFUND_POLICY_LABEL,
+    RESERVATION_HELPER_NOTE,
+    formatChargingRate,
+    formatReservationFee,
+    formatReservationFeePerHour,
+} from "@/lib/pricing";
 
 interface BookingCardProps {
     booking: {
@@ -37,6 +45,8 @@ interface BookingCardProps {
         status: string;
         paymentStatus: string;
         amount: number;
+        reservationFeePerHour?: number;
+        totalReservationFee?: number;
         stationName?: string;
         city?: string;
         chargerType?: string;
@@ -152,10 +162,10 @@ export default function BookingCard({ booking, onCancel }: BookingCardProps) {
                     <div className="mt-4 flex items-end justify-between">
                         <div>
                             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                                Amount
+                                Reservation Fee
                             </p>
                             <p className="text-lg font-bold text-primary">
-                                LKR {booking.amount.toLocaleString()}
+                                {formatReservationFee(booking.amount)}
                             </p>
                             <p className="text-[11px] text-muted-foreground">
                                 {booking.status === "CANCELLED"
@@ -214,6 +224,8 @@ export default function BookingCard({ booking, onCancel }: BookingCardProps) {
                     end,
                     durationHours: booking.durationHours,
                     amount: booking.amount,
+                    reservationFeePerHour: booking.reservationFeePerHour,
+                    totalReservationFee: booking.totalReservationFee,
                     status: booking.status,
                     statusLabel,
                     paymentStatus: booking.paymentStatus,
@@ -254,6 +266,8 @@ interface DetailsBooking {
     end: Date;
     durationHours: number;
     amount: number;
+    reservationFeePerHour?: number;
+    totalReservationFee?: number;
     status: string;
     statusLabel: string;
     paymentStatus: string;
@@ -318,13 +332,19 @@ function BookingDetailsDialog({
                         )}
                         {booking.pricePerKwh !== undefined && (
                             <InfoRow
-                                label="Rate"
-                                value={`LKR ${booking.pricePerKwh} / kWh`}
+                                label="Charging Rate"
+                                value={formatChargingRate(booking.pricePerKwh)}
+                            />
+                        )}
+                        {booking.reservationFeePerHour !== undefined && (
+                            <InfoRow
+                                label="Fee Per Hour"
+                                value={formatReservationFeePerHour(booking.reservationFeePerHour)}
                             />
                         )}
                         <InfoRow label="Status" value={booking.statusLabel} />
                         <InfoRow
-                            label="Payment"
+                            label="Payment Status"
                             value={
                                 booking.status === "CANCELLED"
                                     ? "No refund"
@@ -332,19 +352,28 @@ function BookingDetailsDialog({
                                       booking.paymentStatus.slice(1).toLowerCase()
                             }
                         />
+                        <InfoRow label="Refund Policy" value={REFUND_POLICY_LABEL} />
                     </div>
                     <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
                         <div>
                             <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                                Total Amount
+                                Reservation Fee Paid
                             </p>
                             <p className="text-2xl font-bold text-primary">
-                                LKR {booking.amount.toLocaleString()}
+                                {formatReservationFee(booking.amount)}
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                Online reservation only — charging cost paid at station
                             </p>
                         </div>
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <Zap className="h-5 w-5" />
+                            <Receipt className="h-5 w-5" />
                         </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+                        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                        <p>{RESERVATION_HELPER_NOTE}</p>
                     </div>
                 </div>
                 <DialogFooter>

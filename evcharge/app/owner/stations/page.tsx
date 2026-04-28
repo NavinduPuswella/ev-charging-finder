@@ -127,7 +127,7 @@ export default function OwnerStationsPage() {
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2"><Label>Slots</Label><Input type="number" value={form.totalSlots} onChange={(e) => setForm({ ...form, totalSlots: e.target.value })} required /></div>
-                                <div className="space-y-2"><Label>LKR/kWh</Label><Input type="number" step="0.01" value={form.pricePerKwh} onChange={(e) => setForm({ ...form, pricePerKwh: e.target.value })} required /></div>
+                                <div className="space-y-2"><Label>Charging Rate (LKR / kWh)</Label><Input type="number" step="0.01" placeholder="e.g. 130" value={form.pricePerKwh} onChange={(e) => setForm({ ...form, pricePerKwh: e.target.value })} required /></div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2"><Label>Lat</Label><Input type="number" step="any" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} required /></div>
@@ -157,7 +157,7 @@ export default function OwnerStationsPage() {
                             <CardContent className="space-y-3">
                                 <div className="grid grid-cols-3 gap-2 text-center text-sm">
                                     <div className="p-2 bg-muted/50 rounded-lg"><div className="font-semibold">{s.totalSlots}</div><div className="text-xs text-muted-foreground">Slots</div></div>
-                                    <div className="p-2 bg-muted/50 rounded-lg"><div className="font-semibold">LKR {s.pricePerKwh}</div><div className="text-xs text-muted-foreground">kWh</div></div>
+                                    <div className="p-2 bg-muted/50 rounded-lg"><div className="font-semibold">LKR {s.pricePerKwh} / kWh</div><div className="text-xs text-muted-foreground">Charging Rate</div></div>
                                     <div className="p-2 bg-muted/50 rounded-lg"><div className="font-semibold">{normalizeChargerTypes(s.chargerType).join(", ")}</div><div className="text-xs text-muted-foreground">Type</div></div>
                                 </div>
                                 <Button variant="destructive" size="sm" className="w-full" onClick={() => handleDelete(s._id)}>Delete Station</Button>

@@ -12,6 +12,7 @@ import {
     autoCompleteExpiredBookings,
     validateBookingDateRange,
 } from "@/lib/booking-availability";
+import { calculateTotalReservationFee } from "@/lib/pricing";
 
 export async function GET() {
     try {
@@ -39,7 +40,7 @@ export async function GET() {
                 .sort({ createdAt: -1 });
         } else {
             bookings = await Booking.find({ userId: user.userId })
-                .populate("stationId", "name city pricePerKwh")
+                .populate("stationId", "name city pricePerKwh reservationFeePerHour")
                 .sort({ createdAt: -1 });
         }
 
@@ -130,7 +131,11 @@ export async function POST(request: Request) {
             );
         }
 
-        const amount = Number((station.pricePerKwh * durationHours).toFixed(2));
+        const feePerHour = station.reservationFeePerHour ?? 100;
+        const totalReservationFee = calculateTotalReservationFee(
+            durationHours,
+            feePerHour
+        );
 
         const booking = await Booking.create({
             userId: user.userId,
@@ -143,9 +148,11 @@ export async function POST(request: Request) {
             durationHours,
             chargerType: station.chargerType,
             pricePerKwh: station.pricePerKwh,
+            reservationFeePerHour: feePerHour,
+            totalReservationFee,
             status: "PENDING_PAYMENT",
             paymentStatus: "PENDING",
-            amount,
+            amount: totalReservationFee,
         });
 
         return NextResponse.json(
@@ -153,7 +160,10 @@ export async function POST(request: Request) {
                 booking,
                 message: "Booking created. Please complete payment.",
                 paymentDetails: {
-                    amount,
+                    amount: totalReservationFee,
+                    reservationFeePerHour: feePerHour,
+                    totalReservationFee,
+                    chargingRatePerKwh: station.pricePerKwh,
                     currency: "LKR",
                     status: "pending",
                     bookingId: booking._id.toString(),

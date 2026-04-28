@@ -51,7 +51,10 @@ export default function OwnerBookingsPage() {
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <span className="font-semibold text-primary">LKR {b.amount}</span>
+                                    <div className="text-right">
+                                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Reservation Fee</p>
+                                        <p className="font-semibold text-primary">LKR {b.amount}</p>
+                                    </div>
                                     <Badge variant={b.status === "CONFIRMED" ? "default" : b.status === "COMPLETED" ? "success" : "destructive"}>{b.status}</Badge>
                                 </div>
                             </CardContent>

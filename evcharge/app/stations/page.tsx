@@ -10,9 +10,10 @@ import {
 } from "@/components/ui/select";
 import {
     Search, MapPin, Zap, Star, Clock, Filter,
-    SlidersHorizontal, X, Gauge, CircleDollarSign, CalendarCheck,
-    Loader2, BatteryCharging, SearchX, Navigation, LocateFixed, ArrowRight,
+    SlidersHorizontal, X, Gauge, Receipt, CalendarCheck,
+    Loader2, BatteryCharging, SearchX, Navigation, LocateFixed, ArrowRight, ArrowUpDown,
 } from "lucide-react";
+import { formatChargingRate, formatReservationFeePerHour } from "@/lib/pricing";
 
 interface Station {
     _id: string;
@@ -20,6 +21,7 @@ interface Station {
     city: string;
     chargerType: string;
     pricePerKwh: number;
+    reservationFeePerHour: number;
     rating: number;
     totalSlots: number;
     totalChargingPoints?: number;
@@ -34,6 +36,15 @@ interface Station {
 }
 
 const CHARGER_OPTIONS = ["CCS", "CHAdeMO", "Type1", "Type2", "Tesla"];
+
+type SortKey = "default" | "rate-asc" | "rate-desc" | "rating-desc";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+    { value: "default", label: "Recommended" },
+    { value: "rate-asc", label: "Lowest charging rate" },
+    { value: "rate-desc", label: "Highest charging rate" },
+    { value: "rating-desc", label: "Top rated" },
+];
 
 function toRad(value: number) {
     return (value * Math.PI) / 180;
@@ -70,6 +81,8 @@ export default function StationsPage() {
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [locating, setLocating] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
+    const [maxRate, setMaxRate] = useState("");
+    const [sortBy, setSortBy] = useState<SortKey>("default");
 
     const refreshStations = useCallback(() => {
         fetch("/api/stations")
@@ -100,12 +113,19 @@ export default function StationsPage() {
         );
     };
 
+    const parsedMaxRate = useMemo(() => {
+        const value = Number(maxRate);
+        return Number.isFinite(value) && value > 0 ? value : null;
+    }, [maxRate]);
+
     const activeFilterCount = [
         selectedCity !== "All Cities",
         selectedChargers.length > 0,
         onlyAvailable,
         ratingFourPlus,
         nearbyOnly && userLocation !== null,
+        parsedMaxRate !== null,
+        sortBy !== "default",
     ].filter(Boolean).length;
 
     const clearFilters = () => {
@@ -116,6 +136,8 @@ export default function StationsPage() {
         setRatingFourPlus(false);
         setNearbyOnly(false);
         setRadiusKm("10");
+        setMaxRate("");
+        setSortBy("default");
     };
 
     const useCurrentLocation = () => {
@@ -191,6 +213,18 @@ export default function StationsPage() {
             list = list.filter(({ distanceKm }) => distanceKm !== null && distanceKm <= effectiveRadius);
         }
 
+        if (parsedMaxRate !== null) {
+            list = list.filter(({ station: s }) => Number(s.pricePerKwh) <= parsedMaxRate);
+        }
+
+        if (sortBy === "rate-asc") {
+            list = [...list].sort((a, b) => a.station.pricePerKwh - b.station.pricePerKwh);
+        } else if (sortBy === "rate-desc") {
+            list = [...list].sort((a, b) => b.station.pricePerKwh - a.station.pricePerKwh);
+        } else if (sortBy === "rating-desc") {
+            list = [...list].sort((a, b) => (b.station.rating || 0) - (a.station.rating || 0));
+        }
+
         return list;
     }, [
         stationsWithDistance,
@@ -202,6 +236,8 @@ export default function StationsPage() {
         nearbyOnly,
         userLocation,
         radiusKm,
+        parsedMaxRate,
+        sortBy,
     ]);
 
     return (
@@ -296,6 +332,32 @@ export default function StationsPage() {
                                     </Select>
                                 </FilterField>
 
+                                <FilterField label="Sort by">
+                                    <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+                                        <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white shadow-sm">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {SORT_OPTIONS.map((opt) => (
+                                                <SelectItem key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </FilterField>
+
+                                <FilterField label="Max charging rate (LKR / kWh)">
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        placeholder="e.g. 150"
+                                        value={maxRate}
+                                        onChange={(e) => setMaxRate(e.target.value)}
+                                        className="h-10 rounded-xl border-slate-200 bg-white shadow-sm"
+                                    />
+                                </FilterField>
+
                                 <FilterField label="Nearby Radius (km)">
                                     <Input
                                         type="number"
@@ -306,7 +368,7 @@ export default function StationsPage() {
                                     />
                                 </FilterField>
 
-                                <div className="flex items-end">
+                                <div className="flex items-end sm:col-span-2 lg:col-span-1">
                                     <Button
                                         type="button"
                                         variant="outline"
@@ -427,7 +489,7 @@ function HeaderMetric({ label, value }: { label: string; value: string }) {
 }
 
 function CardBlock({ children }: { children: React.ReactNode }) {
-    return <div className="sticky top-3 z-20 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-[0_14px_36px_-28px_rgba(15,23,42,0.55)] backdrop-blur sm:top-4 sm:p-5">{children}</div>;
+    return <div className="top-20 z-20 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-[0_14px_36px_-28px_rgba(15,23,42,0.55)] backdrop-blur sm:top-20 sm:p-5">{children}</div>;
 }
 
 function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
@@ -540,16 +602,35 @@ function StationCard({
                     ) : null}
                 </div>
 
-                <div className="mb-4 grid grid-cols-3 gap-2">
+                {station.description ? (
+                    <p
+                        className="mb-4 line-clamp-2 text-xs leading-relaxed text-slate-500"
+                        style={{
+                            wordBreak: "break-word",
+                            overflowWrap: "anywhere",
+                            whiteSpace: "pre-wrap",
+                        }}
+                        title={station.description}
+                    >
+                        {station.description}
+                    </p>
+                ) : null}
+
+                <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <StationMetricCell
                         label="Rating"
                         value={station.rating?.toFixed(1) || "—"}
                         icon={<Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />}
                     />
                     <StationMetricCell
-                        label="Price"
-                        value={`LKR ${station.pricePerKwh}`}
-                        icon={<CircleDollarSign className="h-3.5 w-3.5 text-primary" />}
+                        label="Charging Rate"
+                        value={formatChargingRate(station.pricePerKwh)}
+                        icon={<Receipt className="h-3.5 w-3.5 text-primary" />}
+                    />
+                    <StationMetricCell
+                        label="Reservation Fee"
+                        value={formatReservationFeePerHour(station.reservationFeePerHour ?? 100)}
+                        icon={<Receipt className="h-3.5 w-3.5 text-emerald-600" />}
                     />
                     <StationMetricCell
                         label="Points"

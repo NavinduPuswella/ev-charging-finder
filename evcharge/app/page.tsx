@@ -278,6 +278,7 @@ export default function Home() {
               <div className="flex flex-col gap-3">
                 <Link href="/stations" className="text-sm text-foreground">Find Stations</Link>
                 <Link href="/trip-planner" className="text-sm text-foreground">Trip Planner</Link>
+                <Link href="/list-station" className="text-sm text-foreground">List Your Station</Link>
                 <Link href="/dashboard" className="text-sm text-foreground">Dashboard</Link>
               </div>
             </div>

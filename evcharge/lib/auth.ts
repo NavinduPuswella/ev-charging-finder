@@ -4,6 +4,7 @@ import User from "@/models/User";
 
 export interface AuthUser {
     userId: string;
+    name: string;
     email: string;
     role: "USER" | "STATION_OWNER" | "ADMIN";
     clerkId: string;
@@ -35,6 +36,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 
     return {
         userId: user._id.toString(),
+        name: user.name,
         email: user.email,
         role: user.role,
         clerkId: user.clerkId,

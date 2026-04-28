@@ -107,7 +107,7 @@ export default function OwnerDashboard() {
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2"><Label>Total Slots</Label><Input type="number" value={form.totalSlots} onChange={(e) => setForm({ ...form, totalSlots: e.target.value })} required /></div>
-                                <div className="space-y-2"><Label>Price/kWh</Label><Input type="number" step="0.01" value={form.pricePerKwh} onChange={(e) => setForm({ ...form, pricePerKwh: e.target.value })} required /></div>
+                                <div className="space-y-2"><Label>Charging Rate (LKR / kWh)</Label><Input type="number" step="0.01" placeholder="e.g. 130" value={form.pricePerKwh} onChange={(e) => setForm({ ...form, pricePerKwh: e.target.value })} required /></div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2"><Label>Latitude</Label><Input type="number" step="any" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} required /></div>
@@ -145,7 +145,7 @@ export default function OwnerDashboard() {
                                 <CardContent>
                                     <div className="grid grid-cols-3 gap-2 text-sm">
                                         <div className="text-center p-2 bg-muted/50 rounded-lg"><div className="font-semibold">{s.totalSlots}</div><div className="text-xs text-muted-foreground">Slots</div></div>
-                                        <div className="text-center p-2 bg-muted/50 rounded-lg"><div className="font-semibold">LKR {s.pricePerKwh}</div><div className="text-xs text-muted-foreground">kWh</div></div>
+                                        <div className="text-center p-2 bg-muted/50 rounded-lg"><div className="font-semibold">LKR {s.pricePerKwh} / kWh</div><div className="text-xs text-muted-foreground">Charging Rate</div></div>
                                         <div className="text-center p-2 bg-muted/50 rounded-lg"><div className="font-semibold flex items-center justify-center gap-1"><Star className="h-3 w-3 text-yellow-500" />{s.rating.toFixed(1)}</div><div className="text-xs text-muted-foreground">Rating</div></div>
                                     </div>
                                 </CardContent>
@@ -169,7 +169,10 @@ export default function OwnerDashboard() {
                                         <p className="text-xs text-muted-foreground">{new Date(b.date).toLocaleDateString()} · {b.duration}h</p>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <span className="font-semibold text-primary">LKR {b.amount}</span>
+                                        <div className="text-right">
+                                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Reservation Fee</p>
+                                            <p className="font-semibold text-primary">LKR {b.amount}</p>
+                                        </div>
                                         <Badge variant={b.status === "CONFIRMED" ? "default" : b.status === "COMPLETED" ? "success" : "destructive"}>{b.status}</Badge>
                                     </div>
                                 </CardContent>

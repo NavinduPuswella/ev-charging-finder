@@ -22,6 +22,8 @@ interface Booking {
     durationHours: number;
     chargerType?: string;
     pricePerKwh?: number;
+    reservationFeePerHour?: number;
+    totalReservationFee?: number;
     status: "CONFIRMED" | "CANCELLED" | "COMPLETED" | "PENDING_PAYMENT";
     amount: number;
     createdAt: string;
@@ -177,7 +179,8 @@ export default function BookingsPage() {
                                 <TableHead>End</TableHead>
                                 <TableHead>Duration</TableHead>
                                 <TableHead>Charger Type</TableHead>
-                                <TableHead>Price</TableHead>
+                                <TableHead>Charging Rate</TableHead>
+                                <TableHead>Reservation Fee</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Created</TableHead>
                                 <TableHead className="text-right">Action</TableHead>
@@ -199,7 +202,17 @@ export default function BookingsPage() {
                                         <TableCell className="text-sm text-muted-foreground">{new Date(b.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</TableCell>
                                         <TableCell>{b.durationHours}h</TableCell>
                                         <TableCell>{b.chargerType || "—"}</TableCell>
-                                        <TableCell className="font-medium">LKR {b.amount}</TableCell>
+                                        <TableCell className="text-sm text-muted-foreground">
+                                            {b.pricePerKwh !== undefined ? `LKR ${b.pricePerKwh} / kWh` : "—"}
+                                        </TableCell>
+                                        <TableCell className="font-medium">
+                                            <div>LKR {(b.totalReservationFee ?? b.amount).toLocaleString()}</div>
+                                            {b.reservationFeePerHour != null && (
+                                                <div className="text-xs text-muted-foreground font-normal">
+                                                    LKR {b.reservationFeePerHour} / hr
+                                                </div>
+                                            )}
+                                        </TableCell>
                                         <TableCell>
                                             <Badge variant={statusColor(effective) as "default" | "success" | "destructive" | "secondary"}>
                                                 {statusLabel(effective)}

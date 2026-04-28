@@ -18,6 +18,8 @@ interface Booking {
     status: string;
     paymentStatus: string;
     amount: number;
+    reservationFeePerHour?: number;
+    totalReservationFee?: number;
     stationName?: string;
     city?: string;
     chargerType?: string;

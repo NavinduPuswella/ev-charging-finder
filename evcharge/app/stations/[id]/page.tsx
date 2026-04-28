@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MapView from "@/components/map-view";
+import { StationDescription } from "@/components/station-description";
 import {
     MapPin,
     Star,
@@ -20,11 +21,20 @@ import {
     Loader2,
     Phone,
     Timer,
-    ArrowRight,
     BatteryCharging,
+    Info,
+    Receipt,
 } from "lucide-react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
+import {
+    REFUND_POLICY_LABEL,
+    RESERVATION_HELPER_NOTE,
+    formatChargingRate,
+    formatReservationFee,
+    formatReservationFeePerHour,
+    calculateTotalReservationFee,
+} from "@/lib/pricing";
 
 interface Station {
     _id: string;
@@ -32,6 +42,7 @@ interface Station {
     city: string;
     chargerType: string;
     pricePerKwh: number;
+    reservationFeePerHour: number;
     rating: number;
     totalSlots: number;
     totalChargingPoints?: number;
@@ -119,10 +130,6 @@ function getNextHourTimeString() {
     now.setMinutes(0, 0, 0);
     now.setHours(now.getHours() + 1);
     return now.toTimeString().slice(0, 5);
-}
-
-function formatLkr(value: number) {
-    return `LKR ${value} / kWh`;
 }
 
 function toLocalDateInputValue(value: string) {
@@ -631,18 +638,58 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                                         </div>
                                     </div>
 
-                                    {bookingSummary ? (
-                                        <div className="rounded-xl border bg-slate-50 p-4 text-sm">
-                                            <p className="mb-2 font-medium">Booking summary</p>
-                                            <div className="grid gap-1 sm:grid-cols-2">
-                                                <p>Date: {bookingSummary.start.toLocaleDateString()}</p>
-                                                <p>Duration: {bookingSummary.hours} hour(s)</p>
-                                                <p>Start: {bookingSummary.start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
-                                                <p>End: {bookingSummary.end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                                    {bookingSummary && station ? (() => {
+                                        const feePerHour = station.reservationFeePerHour ?? 100;
+                                        const totalFee = calculateTotalReservationFee(bookingSummary.hours, feePerHour);
+                                        return (
+                                        <div className="space-y-3 rounded-xl border bg-slate-50 p-4 text-sm">
+                                            <div>
+                                                <p className="mb-2 flex items-center gap-1.5 font-medium">
+                                                    <Receipt className="h-3.5 w-3.5 text-primary" />
+                                                    Booking summary
+                                                </p>
+                                                <div className="grid gap-1 sm:grid-cols-2 text-muted-foreground">
+                                                    <p>Date: <span className="text-foreground">{bookingSummary.start.toLocaleDateString()}</span></p>
+                                                    <p>Duration: <span className="text-foreground">{bookingSummary.hours} hour(s)</span></p>
+                                                    <p>Start: <span className="text-foreground">{bookingSummary.start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></p>
+                                                    <p>End: <span className="text-foreground">{bookingSummary.end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></p>
+                                                </div>
                                             </div>
-                                            <p className="mt-2 font-semibold text-foreground">Price: {formatLkr(station.pricePerKwh)}</p>
+
+                                            <div className="rounded-lg border bg-white p-3">
+                                                <div className="flex items-center justify-between gap-2 py-1">
+                                                    <span className="text-muted-foreground">Charging Rate</span>
+                                                    <span className="font-medium text-foreground">
+                                                        {formatChargingRate(station.pricePerKwh)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-2 py-1">
+                                                    <span className="text-muted-foreground">Reservation Fee</span>
+                                                    <span className="font-medium text-foreground">
+                                                        {formatReservationFee(feePerHour)} &times; {bookingSummary.hours} hour(s)
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-2 py-1">
+                                                    <span className="text-muted-foreground">Refund Policy</span>
+                                                    <span className="font-medium text-foreground">
+                                                        {REFUND_POLICY_LABEL}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-2 border-t pt-2 flex items-center justify-between gap-2">
+                                                    <span className="text-sm font-semibold">Total Pay Now</span>
+                                                    <span className="text-base font-bold text-primary">
+                                                        {formatReservationFee(totalFee)}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+                                                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                                                <p>{RESERVATION_HELPER_NOTE}</p>
+                                            </div>
                                         </div>
-                                    ) : null}
+                                        );
+                                    })() : null}
 
                                     <div className="rounded-xl border bg-background p-4 text-sm">
                                         <p className="mb-2 font-medium">Availability check</p>
@@ -786,18 +833,17 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
                             </CardContent>
                         </Card>
 
-                        <Card className="border bg-white">
-                            <CardContent className="space-y-4 p-5">
+                        <Card className="overflow-hidden border bg-white">
+                            <CardContent className="min-w-0 space-y-4 p-5">
                                 <p className="text-base font-semibold">Station info</p>
                                 <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label={station.city} />
                                 {station.address ? <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label={station.address} /> : null}
                                 <InfoRow icon={<User className="h-4 w-4 text-primary" />} label={station.ownerId?.name || "Owner"} />
                                 <InfoRow icon={<Zap className="h-4 w-4 text-primary" />} label={`${station.chargerType.split(",").map((t) => t.trim()).filter(Boolean).join(", ")} Charger`} />
-                                <InfoRow icon={<ArrowRight className="h-4 w-4 text-primary" />} label={`Price: ${formatLkr(station.pricePerKwh)}`} />
+                                <InfoRow icon={<Receipt className="h-4 w-4 text-primary" />} label={`Charging Rate: ${formatChargingRate(station.pricePerKwh)}`} />
+                                <InfoRow icon={<Receipt className="h-4 w-4 text-primary" />} label={`Reservation Fee: ${formatReservationFeePerHour(station.reservationFeePerHour ?? 100)}`} />
                                 {station.description ? (
-                                    <div className="rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground">
-                                        {station.description}
-                                    </div>
+                                    <StationDescription text={station.description} />
                                 ) : null}
 
                                 <div className="rounded-lg border border-red-200 bg-red-50 p-3">
@@ -837,9 +883,14 @@ function StatTile({ icon, label, value }: { icon: React.ReactNode; label: string
 
 function InfoRow({ icon, label }: { icon: React.ReactNode; label: string }) {
     return (
-        <div className="flex items-center gap-2 text-sm">
-            {icon}
-            <span>{label}</span>
+        <div className="flex min-w-0 items-start gap-2 text-sm">
+            <span className="mt-0.5 shrink-0">{icon}</span>
+            <span
+                className="min-w-0 flex-1"
+                style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
+            >
+                {label}
+            </span>
         </div>
     );
 }

@@ -124,13 +124,20 @@ export async function GET(req: NextRequest) {
                     status: { $in: ["CONFIRMED", "COMPLETED"] },
                 },
             },
-            { $group: { _id: null, total: { $sum: "$amount" } } },
+            {
+                $group: {
+                    _id: null,
+                    total: {
+                        $sum: { $ifNull: ["$totalReservationFee", "$amount"] },
+                    },
+                },
+            },
         ]);
         const totalRevenue = revenueResult[0]?.total || 0;
 
         const bookingsInRange = await Booking.find(
             { createdAt: { $gte: rangeStart, $lte: rangeEnd } },
-            { createdAt: 1, amount: 1, status: 1 }
+            { createdAt: 1, amount: 1, totalReservationFee: 1, status: 1 }
         ).lean();
 
         const bookingsTrend = buckets.map((b) => {
@@ -141,7 +148,9 @@ export async function GET(req: NextRequest) {
                 if (ts >= b.start.getTime() && ts <= b.end.getTime()) {
                     count += 1;
                     if (bk.status === "CONFIRMED" || bk.status === "COMPLETED") {
-                        revenue += (bk.amount as number) || 0;
+                        revenue += ((bk as Record<string, unknown>).totalReservationFee as number)
+                            ?? (bk.amount as number)
+                            ?? 0;
                     }
                 }
             }
@@ -173,7 +182,7 @@ export async function GET(req: NextRequest) {
             },
         ]);
 
-        const recentBookings = await Booking.find({}, { stationName: 1, city: 1, status: 1, createdAt: 1, amount: 1 })
+        const recentBookings = await Booking.find({}, { stationName: 1, city: 1, status: 1, createdAt: 1, amount: 1, totalReservationFee: 1 })
             .sort({ createdAt: -1 })
             .limit(5)
             .lean();
@@ -232,7 +241,7 @@ export async function GET(req: NextRequest) {
                 activity.push({
                     type: "booking_created",
                     title: `New booking at ${b.stationName}`,
-                    subtitle: `${b.city} · LKR ${(b.amount || 0).toLocaleString()}`,
+                    subtitle: `${b.city} · LKR ${((b as Record<string, unknown>).totalReservationFee as number ?? b.amount ?? 0).toLocaleString()}`,
                     timestamp: new Date((b as { createdAt: Date }).createdAt),
                 });
             }
@@ -264,6 +273,7 @@ export async function GET(req: NextRequest) {
 
         const flaggedReviews = await Review.countDocuments({ rating: { $lte: 2 } });
         const bookingsNeedingReview = await Booking.countDocuments({ status: "PENDING_PAYMENT" });
+        const pendingSubmissions = await Station.countDocuments({ isApproved: false });
 
         return NextResponse.json({
             analytics: {
@@ -285,6 +295,7 @@ export async function GET(req: NextRequest) {
                     flaggedReviews,
                     disabledStations: inactiveStations,
                     bookingsNeedingReview,
+                    pendingSubmissions,
                 },
             },
         });

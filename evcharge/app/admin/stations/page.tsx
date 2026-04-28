@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,6 +20,13 @@ import {
     Search, MapPin, Zap, Pencil, Power, ShieldCheck, X, Plus, Loader2, Trash2, Navigation,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+    DESCRIPTION_PLACEHOLDER,
+    DESCRIPTION_WORD_ERROR,
+    MAX_DESCRIPTION_WORDS,
+    countWords,
+    sanitizeDescription,
+} from "@/lib/station-description";
 
 interface Station {
     _id: string;
@@ -29,6 +37,7 @@ interface Station {
     totalSlots: number;
     totalChargingPoints?: number;
     pricePerKwh: number;
+    reservationFeePerHour: number;
     rating: number;
     isApproved: boolean;
     status?: "AVAILABLE" | "LIMITED" | "MAINTENANCE" | "INACTIVE";
@@ -54,7 +63,7 @@ const formatChargerTypes = (value: string | string[]) => {
 
 const emptyForm = {
     name: "", city: "", address: "", chargerType: ["Type2"], totalSlots: "", pricePerKwh: "",
-    latitude: "", longitude: "", description: "", status: "AVAILABLE",
+    reservationFeePerHour: "100", latitude: "", longitude: "", description: "", status: "AVAILABLE",
 };
 
 export default function StationsManagementPage() {
@@ -62,7 +71,7 @@ export default function StationsManagementPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [editForm, setEditForm] = useState({ name: "", address: "", chargerType: [] as string[], totalChargingPoints: 0, pricePerKwh: 0, status: "AVAILABLE", description: "" });
+    const [editForm, setEditForm] = useState({ name: "", address: "", chargerType: [] as string[], totalChargingPoints: 0, pricePerKwh: 0, reservationFeePerHour: 100, status: "AVAILABLE", description: "" });
     const [dialogOpen, setDialogOpen] = useState(false);
     const [form, setForm] = useState(emptyForm);
     const [submitting, setSubmitting] = useState(false);
@@ -83,6 +92,11 @@ export default function StationsManagementPage() {
     };
 
     useEffect(() => { fetchStations(); }, []);
+
+    const createDescriptionWords = useMemo(() => countWords(form.description), [form.description]);
+    const createDescriptionOver = createDescriptionWords > MAX_DESCRIPTION_WORDS;
+    const editDescriptionWords = useMemo(() => countWords(editForm.description), [editForm.description]);
+    const editDescriptionOver = editDescriptionWords > MAX_DESCRIPTION_WORDS;
 
     const approved = useMemo(
         () => stations
@@ -124,7 +138,8 @@ export default function StationsManagementPage() {
         setEditingId(s._id);
         setEditForm({
             name: s.name, address: s.address || "", chargerType: normalizeChargerTypes(s.chargerType),
-            totalChargingPoints: s.totalChargingPoints || s.totalSlots, pricePerKwh: s.pricePerKwh, status: s.status || "AVAILABLE",
+            totalChargingPoints: s.totalChargingPoints || s.totalSlots, pricePerKwh: s.pricePerKwh,
+            reservationFeePerHour: s.reservationFeePerHour ?? 100, status: s.status || "AVAILABLE",
             description: s.description || "",
         });
     };
@@ -134,6 +149,10 @@ export default function StationsManagementPage() {
             toast.error("Select at least one charger type");
             return;
         }
+        if (countWords(editForm.description) > MAX_DESCRIPTION_WORDS) {
+            toast.error(DESCRIPTION_WORD_ERROR);
+            return;
+        }
         try {
             const res = await fetch(`/api/stations/${id}`, {
                 method: "PUT",
@@ -141,8 +160,9 @@ export default function StationsManagementPage() {
                 body: JSON.stringify({
                     name: editForm.name, address: editForm.address, chargerType: editForm.chargerType,
                     totalChargingPoints: editForm.totalChargingPoints, totalSlots: editForm.totalChargingPoints,
-                    pricePerKwh: editForm.pricePerKwh, status: editForm.status,
-                    description: editForm.description || undefined,
+                    pricePerKwh: editForm.pricePerKwh, reservationFeePerHour: editForm.reservationFeePerHour,
+                    status: editForm.status,
+                    description: sanitizeDescription(editForm.description) || undefined,
                 }),
             });
             if (res.ok) {
@@ -206,6 +226,10 @@ export default function StationsManagementPage() {
             toast.error("Select at least one charger type");
             return;
         }
+        if (countWords(form.description) > MAX_DESCRIPTION_WORDS) {
+            toast.error(DESCRIPTION_WORD_ERROR);
+            return;
+        }
         setSubmitting(true);
         try {
             const res = await fetch("/api/stations", {
@@ -214,9 +238,11 @@ export default function StationsManagementPage() {
                 body: JSON.stringify({
                     name: form.name, city: form.city, address: form.address, chargerType: form.chargerType,
                     totalChargingPoints: Number(form.totalSlots), totalSlots: Number(form.totalSlots),
-                    pricePerKwh: Number(form.pricePerKwh), status: form.status,
+                    pricePerKwh: Number(form.pricePerKwh),
+                    reservationFeePerHour: Number(form.reservationFeePerHour) || 100,
+                    status: form.status,
                     location: { latitude: Number(form.latitude), longitude: Number(form.longitude) },
-                    description: form.description || undefined,
+                    description: sanitizeDescription(form.description) || undefined,
                 }),
             });
             const data = await res.json();
@@ -315,7 +341,8 @@ export default function StationsManagementPage() {
                             <div className="space-y-2"><Label>Address</Label><Input placeholder="e.g. 12 York St, Colombo 01" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2"><Label>Total Charging Points</Label><Input type="number" placeholder="e.g. 4" value={form.totalSlots} onChange={(e) => setForm({ ...form, totalSlots: e.target.value })} required /></div>
-                                <div className="space-y-2"><Label>Price/kWh (LKR)</Label><Input type="number" step="0.01" placeholder="e.g. 65" value={form.pricePerKwh} onChange={(e) => setForm({ ...form, pricePerKwh: e.target.value })} required /></div>
+                                <div className="space-y-2"><Label>Charging Rate (LKR / kWh)</Label><Input type="number" step="0.01" placeholder="e.g. 130" value={form.pricePerKwh} onChange={(e) => setForm({ ...form, pricePerKwh: e.target.value })} required /></div>
+                                <div className="space-y-2"><Label>Reservation Fee Per Hour (LKR)</Label><Input type="number" min="0" placeholder="e.g. 100" value={form.reservationFeePerHour} onChange={(e) => setForm({ ...form, reservationFeePerHour: e.target.value })} required /></div>
                                 <div className="space-y-2">
                                     <Label>Status</Label>
                                     <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
@@ -338,10 +365,44 @@ export default function StationsManagementPage() {
                                 Use Current Location
                             </Button>
                             <div className="space-y-2">
-                                <Label>Description <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                                <Input placeholder="Brief description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <Label htmlFor="admin-create-description">
+                                        Description <span className="text-muted-foreground text-xs">(optional)</span>
+                                    </Label>
+                                    <span
+                                        className={`text-[11px] font-medium tabular-nums ${
+                                            createDescriptionOver ? "text-red-600" : "text-muted-foreground"
+                                        }`}
+                                        aria-live="polite"
+                                    >
+                                        {createDescriptionWords} / {MAX_DESCRIPTION_WORDS} words
+                                    </span>
+                                </div>
+                                <Textarea
+                                    id="admin-create-description"
+                                    placeholder={DESCRIPTION_PLACEHOLDER}
+                                    rows={4}
+                                    value={form.description}
+                                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                                    className={`min-h-[120px] w-full max-w-full resize-y rounded-lg text-sm leading-relaxed ${
+                                        createDescriptionOver ? "border-red-400 focus-visible:ring-red-400" : ""
+                                    }`}
+                                    style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
+                                    aria-invalid={createDescriptionOver}
+                                />
+                                {createDescriptionOver ? (
+                                    <p className="text-xs font-medium text-red-600">{DESCRIPTION_WORD_ERROR}</p>
+                                ) : null}
                             </div>
-                            <DialogFooter><Button type="submit" className="w-full" disabled={submitting}>{submitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating...</> : "Add Station"}</Button></DialogFooter>
+                            <DialogFooter>
+                                <Button
+                                    type="submit"
+                                    className="w-full"
+                                    disabled={submitting || createDescriptionOver}
+                                >
+                                    {submitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating...</> : "Add Station"}
+                                </Button>
+                            </DialogFooter>
                         </form>
                     </DialogContent>
                 </Dialog>
@@ -369,7 +430,8 @@ export default function StationsManagementPage() {
                                 <TableHead>Charger Type</TableHead>
                                 <TableHead>Description</TableHead>
                                 <TableHead className="text-right">Points</TableHead>
-                                <TableHead className="text-right">Price (LKR/kWh)</TableHead>
+                                <TableHead className="text-right">Charging Rate (LKR / kWh)</TableHead>
+                                <TableHead className="text-right">Reservation Fee (LKR / hr)</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -417,16 +479,54 @@ export default function StationsManagementPage() {
                                             </div>
                                         )}
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="max-w-[260px] align-top">
                                         {editingId === s._id ? (
-                                            <Input
-                                                value={editForm.description}
-                                                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                                                className="h-8 text-sm"
-                                                placeholder="Description"
-                                            />
+                                            <div className="space-y-1">
+                                                <Textarea
+                                                    value={editForm.description}
+                                                    onChange={(e) =>
+                                                        setEditForm({ ...editForm, description: e.target.value })
+                                                    }
+                                                    className={`min-h-[88px] w-full max-w-full resize-y rounded-md text-sm ${
+                                                        editDescriptionOver
+                                                            ? "border-red-400 focus-visible:ring-red-400"
+                                                            : ""
+                                                    }`}
+                                                    style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
+                                                    placeholder={DESCRIPTION_PLACEHOLDER}
+                                                    aria-invalid={editDescriptionOver}
+                                                />
+                                                <div className="flex items-center justify-between gap-2 text-[10px]">
+                                                    <span
+                                                        className={
+                                                            editDescriptionOver
+                                                                ? "font-medium text-red-600"
+                                                                : "text-muted-foreground"
+                                                        }
+                                                    >
+                                                        {editDescriptionWords} / {MAX_DESCRIPTION_WORDS} words
+                                                    </span>
+                                                    {editDescriptionOver ? (
+                                                        <span className="font-medium text-red-600">
+                                                            {DESCRIPTION_WORD_ERROR}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                        ) : s.description ? (
+                                            <p
+                                                className="line-clamp-3 text-sm text-muted-foreground"
+                                                style={{
+                                                    wordBreak: "break-word",
+                                                    overflowWrap: "anywhere",
+                                                    whiteSpace: "pre-wrap",
+                                                }}
+                                                title={s.description}
+                                            >
+                                                {s.description}
+                                            </p>
                                         ) : (
-                                            <span className="text-sm text-muted-foreground">{s.description || "-"}</span>
+                                            <span className="text-sm text-muted-foreground">-</span>
                                         )}
                                     </TableCell>
                                     <TableCell className="text-right">
@@ -443,6 +543,13 @@ export default function StationsManagementPage() {
                                             <span className="font-semibold">LKR {s.pricePerKwh}</span>
                                         )}
                                     </TableCell>
+                                    <TableCell className="text-right">
+                                        {editingId === s._id ? (
+                                            <Input type="number" min="0" value={editForm.reservationFeePerHour} onChange={(e) => setEditForm({ ...editForm, reservationFeePerHour: Number(e.target.value) })} className="h-8 text-sm w-20 ml-auto" />
+                                        ) : (
+                                            <span className="font-semibold">LKR {s.reservationFeePerHour ?? 100}</span>
+                                        )}
+                                    </TableCell>
                                     <TableCell>
                                         <Badge variant={s.status === "INACTIVE" ? "destructive" : "success"}>
                                             {s.status === "INACTIVE" ? "Closed" : (s.status || "AVAILABLE")}
@@ -452,7 +559,13 @@ export default function StationsManagementPage() {
                                         <div className="flex items-center justify-end gap-2">
                                             {editingId === s._id ? (
                                                 <>
-                                                    <Button size="sm" onClick={() => saveEdit(s._id)}>Save</Button>
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => saveEdit(s._id)}
+                                                        disabled={editDescriptionOver}
+                                                    >
+                                                        Save
+                                                    </Button>
                                                     <Button size="sm" variant="outline" className="gap-1" onClick={cancelEdit}><X className="h-3.5 w-3.5" /> Cancel</Button>
                                                 </>
                                             ) : (

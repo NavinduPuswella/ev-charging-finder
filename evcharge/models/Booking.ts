@@ -11,9 +11,18 @@ export interface IBooking extends Document {
     endTime: Date;
     durationHours: number;
     chargerType: string;
+    /** Snapshot of the station's charging rate (LKR per kWh) at booking time. */
     pricePerKwh: number;
+    /** Snapshot of the station's per-hour reservation fee at booking time. */
+    reservationFeePerHour: number;
+    /** Calculated: durationHours × reservationFeePerHour */
+    totalReservationFee: number;
     status: "PENDING_PAYMENT" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
     paymentStatus: "PENDING" | "PAID" | "REFUNDED";
+    /**
+     * Total reservation fee paid online (LKR), kept in sync with
+     * totalReservationFee for backward compatibility with analytics.
+     */
     amount: number;
 }
 
@@ -63,6 +72,16 @@ const BookingSchema = new Schema<IBooking>(
             type: Number,
             required: [true, "Price per kWh is required"],
             min: [0, "Price cannot be negative"],
+        },
+        reservationFeePerHour: {
+            type: Number,
+            required: [true, "Reservation fee per hour is required"],
+            min: [0, "Reservation fee cannot be negative"],
+        },
+        totalReservationFee: {
+            type: Number,
+            required: [true, "Total reservation fee is required"],
+            min: [0, "Total reservation fee cannot be negative"],
         },
         status: {
             type: String,
