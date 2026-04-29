@@ -240,7 +240,7 @@ export default function LocationMapPicker({
                         distanceKm,
                     } satisfies LocationSuggestion;
                 })
-                .filter((item): item is LocationSuggestion => item !== null)
+                .filter((item): item is Exclude<typeof item, null> => item !== null)
                 .sort((a, b) => {
                     if (a.distanceKm == null && b.distanceKm == null) return 0;
                     if (a.distanceKm == null) return 1;

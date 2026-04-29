@@ -24,6 +24,8 @@ export interface IBooking extends Document {
      * totalReservationFee for backward compatibility with analytics.
      */
     amount: number;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 const BookingSchema = new Schema<IBooking>(

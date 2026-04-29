@@ -652,7 +652,7 @@ export default function TripPlanner() {
                           }
                         : null
                 )
-                .filter((p): p is MapPointWithLabel => !!p),
+                .filter((p): p is Exclude<typeof p, null> => p !== null),
         [waypoints]
     );
 

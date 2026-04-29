@@ -144,12 +144,12 @@ export async function GET(req: NextRequest) {
             let count = 0;
             let revenue = 0;
             for (const bk of bookingsInRange) {
-                const ts = new Date(bk.createdAt as Date).getTime();
+                const ts = new Date(bk.createdAt).getTime();
                 if (ts >= b.start.getTime() && ts <= b.end.getTime()) {
                     count += 1;
                     if (bk.status === "CONFIRMED" || bk.status === "COMPLETED") {
-                        revenue += ((bk as Record<string, unknown>).totalReservationFee as number)
-                            ?? (bk.amount as number)
+                        revenue += bk.totalReservationFee
+                            ?? bk.amount
                             ?? 0;
                     }
                 }
@@ -241,7 +241,7 @@ export async function GET(req: NextRequest) {
                 activity.push({
                     type: "booking_created",
                     title: `New booking at ${b.stationName}`,
-                    subtitle: `${b.city} · LKR ${((b as Record<string, unknown>).totalReservationFee as number ?? b.amount ?? 0).toLocaleString()}`,
+                    subtitle: `${b.city} · LKR ${(b.totalReservationFee ?? b.amount ?? 0).toLocaleString()}`,
                     timestamp: new Date((b as { createdAt: Date }).createdAt),
                 });
             }
