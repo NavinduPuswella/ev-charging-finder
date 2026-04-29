@@ -30,7 +30,6 @@ import {
     Plug,
     Send,
     ShieldCheck,
-    Sparkles,
     Star,
     User as UserIcon,
     Users,
@@ -45,7 +44,7 @@ import {
     sanitizeDescription,
 } from "@/lib/station-description";
 
-const MapViewLeaflet = dynamic(() => import("@/components/map-view-leaflet"), {
+const LocationMapPicker = dynamic(() => import("@/components/location-map-picker"), {
     ssr: false,
     loading: () => (
         <div className="flex h-full min-h-[280px] items-center justify-center rounded-xl border border-border bg-muted/30">
@@ -218,21 +217,6 @@ export default function ListStationPage() {
         );
     };
 
-    const previewStation = useMemo(() => {
-        const lat = Number(form.latitude);
-        const lng = Number(form.longitude);
-        if (!isValidLat(lat) || !isValidLng(lng)) return null;
-        return [
-            {
-                _id: "preview",
-                name: form.name || "Your Station",
-                city: form.city,
-                location: { latitude: lat, longitude: lng },
-                availabilityStatus: "Available" as const,
-            },
-        ];
-    }, [form.latitude, form.longitude, form.name, form.city]);
-
     const validate = (): string | null => {
         const submitterName = form.submitterName.trim();
         if (!submitterName || submitterName.length < 2) return "Your full name is required.";
@@ -307,6 +291,8 @@ export default function ListStationPage() {
                         : undefined,
                     status: form.status,
                     description: sanitizeDescription(form.description) || undefined,
+                    latitude: Number(form.latitude),
+                    longitude: Number(form.longitude),
                     location: {
                         latitude: Number(form.latitude),
                         longitude: Number(form.longitude),
@@ -721,6 +707,8 @@ export default function ListStationPage() {
                                                         <Input
                                                             type="number"
                                                             step="any"
+                                                            min="-90"
+                                                            max="90"
                                                             placeholder="e.g. 6.9271"
                                                             value={form.latitude}
                                                             onChange={(e) =>
@@ -735,6 +723,8 @@ export default function ListStationPage() {
                                                         <Input
                                                             type="number"
                                                             step="any"
+                                                            min="-180"
+                                                            max="180"
                                                             placeholder="e.g. 79.8612"
                                                             value={form.longitude}
                                                             onChange={(e) =>
@@ -856,25 +846,24 @@ export default function ListStationPage() {
                                                 Map preview
                                             </p>
                                         </div>
-                                        <div className="h-[260px] overflow-hidden rounded-xl">
-                                            {previewStation ? (
-                                                <MapViewLeaflet
-                                                    stations={previewStation}
-                                                    center={{
-                                                        lat: Number(form.latitude),
-                                                        lng: Number(form.longitude),
-                                                    }}
-                                                    className="h-full"
-                                                />
-                                            ) : (
-                                                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 text-center">
-                                                    <p className="px-4 text-xs text-muted-foreground">
-                                                        Enter latitude and longitude (or use current
-                                                        location) to see your station on the map.
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
+                                        <LocationMapPicker
+                                            latitude={form.latitude}
+                                            longitude={form.longitude}
+                                            onCoordinatesChange={(latitude, longitude) =>
+                                                setForm((prev) => ({
+                                                    ...prev,
+                                                    latitude,
+                                                    longitude,
+                                                }))
+                                            }
+                                            onUseDetectedAddress={(detected) =>
+                                                setForm((prev) => ({
+                                                    ...prev,
+                                                    city: detected.city || prev.city,
+                                                    address: detected.address,
+                                                }))
+                                            }
+                                        />
                                     </CardContent>
                                 </Card>
 

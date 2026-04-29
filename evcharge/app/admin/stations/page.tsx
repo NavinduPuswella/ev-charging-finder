@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,15 @@ interface Station {
 
 const CHARGER_TYPES = ["Type1", "Type2", "CCS", "CHAdeMO", "Tesla"] as const;
 
+const LocationMapPicker = dynamic(() => import("@/components/location-map-picker"), {
+    ssr: false,
+    loading: () => (
+        <div className="flex h-[260px] items-center justify-center rounded-xl border border-border bg-muted/30">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+    ),
+});
+
 const normalizeChargerTypes = (value: string | string[] | undefined) => {
     if (Array.isArray(value)) return value.filter(Boolean);
     if (typeof value !== "string" || !value.trim()) return [];
@@ -65,6 +75,14 @@ const emptyForm = {
     name: "", city: "", address: "", chargerType: ["Type2"], totalSlots: "", pricePerKwh: "",
     reservationFeePerHour: "100", latitude: "", longitude: "", description: "", status: "AVAILABLE",
 };
+
+function isValidLat(lat: number) {
+    return Number.isFinite(lat) && lat >= -90 && lat <= 90;
+}
+
+function isValidLng(lng: number) {
+    return Number.isFinite(lng) && lng >= -180 && lng <= 180;
+}
 
 export default function StationsManagementPage() {
     const [stations, setStations] = useState<Station[]>([]);
@@ -230,6 +248,12 @@ export default function StationsManagementPage() {
             toast.error(DESCRIPTION_WORD_ERROR);
             return;
         }
+        const lat = Number(form.latitude);
+        const lng = Number(form.longitude);
+        if (!isValidLat(lat) || !isValidLng(lng)) {
+            toast.error("Please provide valid coordinates.");
+            return;
+        }
         setSubmitting(true);
         try {
             const res = await fetch("/api/stations", {
@@ -241,7 +265,9 @@ export default function StationsManagementPage() {
                     pricePerKwh: Number(form.pricePerKwh),
                     reservationFeePerHour: Number(form.reservationFeePerHour) || 100,
                     status: form.status,
-                    location: { latitude: Number(form.latitude), longitude: Number(form.longitude) },
+                    latitude: lat,
+                    longitude: lng,
+                    location: { latitude: lat, longitude: lng },
                     description: sanitizeDescription(form.description) || undefined,
                 }),
             });
@@ -312,7 +338,7 @@ export default function StationsManagementPage() {
                     <DialogTrigger asChild>
                         <Button className="gap-2"><Plus className="h-4 w-4" /> Add Station</Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-lg">
+                    <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
                         <DialogHeader>
                             <DialogTitle>Add New Charging Station</DialogTitle>
                             <DialogDescription>Station will be auto-approved by admin</DialogDescription>
@@ -357,13 +383,28 @@ export default function StationsManagementPage() {
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-2"><Label>Latitude</Label><Input type="number" step="any" placeholder="e.g. 6.9271" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} required /></div>
-                                <div className="space-y-2"><Label>Longitude</Label><Input type="number" step="any" placeholder="e.g. 79.8612" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} required /></div>
+                                <div className="space-y-2"><Label>Latitude</Label><Input type="number" step="any" min="-90" max="90" placeholder="e.g. 6.9271" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} required /></div>
+                                <div className="space-y-2"><Label>Longitude</Label><Input type="number" step="any" min="-180" max="180" placeholder="e.g. 79.8612" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} required /></div>
                             </div>
                             <Button type="button" variant="outline" size="sm" className="w-full gap-1.5" onClick={useCurrentLocation} disabled={geoLoading}>
                                 {geoLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Navigation className="h-3.5 w-3.5" />}
                                 Use Current Location
                             </Button>
+                            <LocationMapPicker
+                                latitude={form.latitude}
+                                longitude={form.longitude}
+                                mapClassName="h-[240px]"
+                                onCoordinatesChange={(latitude, longitude) =>
+                                    setForm((prev) => ({ ...prev, latitude, longitude }))
+                                }
+                                onUseDetectedAddress={(detected) =>
+                                    setForm((prev) => ({
+                                        ...prev,
+                                        city: detected.city || prev.city,
+                                        address: detected.address,
+                                    }))
+                                }
+                            />
                             <div className="space-y-2">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <Label htmlFor="admin-create-description">
