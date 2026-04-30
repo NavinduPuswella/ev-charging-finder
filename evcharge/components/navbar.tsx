@@ -6,8 +6,6 @@ import { useState, useEffect, useRef } from "react";
 import {
     SignInButton,
     SignUpButton,
-    SignedIn,
-    SignedOut,
     UserButton,
     useAuth,
     useUser,
@@ -28,7 +26,7 @@ import {
 
 export default function Navbar() {
     const pathname = usePathname();
-    const { isLoaded } = useAuth();
+    const { isLoaded, isSignedIn } = useAuth();
     const { user: clerkUser } = useUser();
     const { user, fetchUser } = useAuthStore();
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -169,19 +167,21 @@ export default function Navbar() {
                                 <div className="h-8 w-20 animate-pulse bg-muted" />
                             ) : (
                                 <>
-                                    <SignedOut>
-                                        <SignInButton mode="redirect">
-                                            <Button variant="ghost" size="sm" className={`rounded-md px-3 font-medium ${useWhiteNavText ? "text-white" : "text-muted-foreground"}`}>
-                                                Sign In
-                                            </Button>
-                                        </SignInButton>
-                                        <SignUpButton mode="redirect">
-                                            <Button size="sm" className="rounded-md px-4">
-                                                Get Started
-                                            </Button>
-                                        </SignUpButton>
-                                    </SignedOut>
-                                    <SignedIn>
+                                    {!isSignedIn ? (
+                                        <>
+                                            <SignInButton mode="redirect">
+                                                <Button variant="ghost" size="sm" className={`rounded-md px-3 font-medium ${useWhiteNavText ? "text-white" : "text-muted-foreground"}`}>
+                                                    Sign In
+                                                </Button>
+                                            </SignInButton>
+                                            <SignUpButton mode="redirect">
+                                                <Button size="sm" className="rounded-md px-4">
+                                                    Get Started
+                                                </Button>
+                                            </SignUpButton>
+                                        </>
+                                    ) : (
+                                        <>
                                         <Link href={getDashboardLink()}>
                                             <Button variant="ghost" size="sm" className={`gap-2 rounded-md px-3 ${useWhiteNavText ? "text-white" : "text-muted-foreground"}`}>
                                                 {dashboardIcon}
@@ -189,14 +189,14 @@ export default function Navbar() {
                                             </Button>
                                         </Link>
                                         <UserButton
-                                            afterSignOutUrl="/"
                                             appearance={{
                                                 elements: {
                                                     avatarBox: "h-8 w-8",
                                                 },
                                             }}
                                         />
-                                    </SignedIn>
+                                        </>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -227,7 +227,8 @@ export default function Navbar() {
                                     {label}
                                 </Link>
                             ))}
-                            <SignedIn>
+                            {isSignedIn ? (
+                                <>
                                 <Link
                                     href={getDashboardLink()}
                                     onClick={() => setMobileOpen(false)}
@@ -238,7 +239,6 @@ export default function Navbar() {
                                 </Link>
                                 <div className="pt-3 mt-2 border-t border-border">
                                     <UserButton
-                                        afterSignOutUrl="/"
                                         appearance={{
                                             elements: {
                                                 avatarBox: "h-8 w-8",
@@ -246,8 +246,8 @@ export default function Navbar() {
                                         }}
                                     />
                                 </div>
-                            </SignedIn>
-                            <SignedOut>
+                                </>
+                            ) : (
                                 <div className="flex flex-col gap-2 pt-3 mt-2 border-t border-border">
                                     <SignInButton mode="redirect">
                                         <Button variant="outline" className="w-full">
@@ -258,7 +258,7 @@ export default function Navbar() {
                                         <Button className="w-full">Get Started</Button>
                                     </SignUpButton>
                                 </div>
-                            </SignedOut>
+                            )}
                         </div>
                     </div>
                 )}
