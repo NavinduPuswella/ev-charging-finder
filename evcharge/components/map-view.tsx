@@ -20,7 +20,9 @@ export interface MapPointWithLabel extends MapRoutePoint {
     label?: string;
 }
 
-interface MapViewProps {
+export type PickMode = "origin" | "destination" | `waypoint-${string}` | null;
+
+export interface MapViewProps {
     stations?: MapViewStation[];
     center?: MapRoutePoint;
     routePath?: MapRoutePoint[];
@@ -29,6 +31,11 @@ interface MapViewProps {
     waypoints?: MapPointWithLabel[];
     highlightedStationIds?: string[];
     className?: string;
+    pickMode?: PickMode;
+    onOriginDrag?: (lat: number, lng: number) => void;
+    onDestinationDrag?: (lat: number, lng: number) => void;
+    onWaypointDrag?: (index: number, lat: number, lng: number) => void;
+    onMapPick?: (lat: number, lng: number) => void;
 }
 
 const LeafletMap = dynamic(() => import("./map-view-leaflet"), {

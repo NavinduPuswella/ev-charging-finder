@@ -3,7 +3,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
-import MapView, { type MapPointWithLabel } from "@/components/map-view";
+import MapView, { type MapPointWithLabel, type PickMode } from "@/components/map-view";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import {
     Route, MapPin, Zap, Star, Navigation, Loader2, Battery,
-    Search, CalendarCheck, SearchX, AlertTriangle, Map,
+    Search, CalendarCheck, SearchX, AlertTriangle, Map, Crosshair,
     Clock3, Gauge, Bot, Coins, ArrowRight, CircleDot, SlidersHorizontal,
     Plus, Trash2, ArrowUp, ArrowDown, Receipt,
 } from "lucide-react";
@@ -397,6 +397,23 @@ function PlaceAutocomplete({
     );
 }
 
+async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+    try {
+        const params = new URLSearchParams({
+            format: "jsonv2",
+            lat: String(lat),
+            lon: String(lng),
+            addressdetails: "1",
+        });
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.display_name || null;
+    } catch {
+        return null;
+    }
+}
+
 export default function TripPlanner() {
     const { isLoaded: authLoaded, isSignedIn } = useUser();
     const [originText, setOriginText] = useState("");
@@ -415,6 +432,8 @@ export default function TripPlanner() {
     const [result, setResult] = useState<TripPlanResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [geoLoading, setGeoLoading] = useState(false);
+    const [pickMode, setPickMode] = useState<PickMode>(null);
+    const [recalcTrigger, setRecalcTrigger] = useState(0);
 
     const loadSavedVehicles = useCallback(async () => {
         const res = await fetch("/api/vehicles", { credentials: "include" });
@@ -561,15 +580,133 @@ export default function TripPlanner() {
         if (!navigator.geolocation) return;
         setGeoLoading(true);
         navigator.geolocation.getCurrentPosition(
-            (pos) => {
+            async (pos) => {
                 const current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 setOriginCoords(current);
-                setOriginText("Current Location");
+                const address = await reverseGeocode(current.lat, current.lng);
+                setOriginText(address || "Current Location");
                 setGeoLoading(false);
             },
             () => setGeoLoading(false)
         );
     };
+
+    const triggerRecalc = useCallback(() => {
+        setRecalcTrigger((n) => n + 1);
+    }, []);
+
+    const handleOriginDrag = useCallback(async (lat: number, lng: number) => {
+        setOriginCoords({ lat, lng });
+        const address = await reverseGeocode(lat, lng);
+        if (address) setOriginText(address);
+        triggerRecalc();
+    }, [triggerRecalc]);
+
+    const handleDestinationDrag = useCallback(async (lat: number, lng: number) => {
+        setDestinationCoords({ lat, lng });
+        const address = await reverseGeocode(lat, lng);
+        if (address) setDestinationText(address);
+        triggerRecalc();
+    }, [triggerRecalc]);
+
+    const handleWaypointDrag = useCallback(async (index: number, lat: number, lng: number) => {
+        setWaypoints((current) =>
+            current.map((wp, i) =>
+                i === index ? { ...wp, coords: { lat, lng } } : wp
+            )
+        );
+        const address = await reverseGeocode(lat, lng);
+        if (address) {
+            setWaypoints((current) =>
+                current.map((wp, i) =>
+                    i === index ? { ...wp, text: address } : wp
+                )
+            );
+        }
+        triggerRecalc();
+    }, [triggerRecalc]);
+
+    const handleMapPick = useCallback(async (lat: number, lng: number) => {
+        if (!pickMode) return;
+
+        if (pickMode === "origin") {
+            setOriginCoords({ lat, lng });
+            const address = await reverseGeocode(lat, lng);
+            if (address) setOriginText(address);
+        } else if (pickMode === "destination") {
+            setDestinationCoords({ lat, lng });
+            const address = await reverseGeocode(lat, lng);
+            if (address) setDestinationText(address);
+        } else if (pickMode.startsWith("waypoint-")) {
+            const wpId = pickMode.replace("waypoint-", "");
+            setWaypoints((current) =>
+                current.map((wp) =>
+                    wp.id === wpId ? { ...wp, coords: { lat, lng } } : wp
+                )
+            );
+            const address = await reverseGeocode(lat, lng);
+            if (address) {
+                setWaypoints((current) =>
+                    current.map((wp) =>
+                        wp.id === wpId ? { ...wp, text: address } : wp
+                    )
+                );
+            }
+        }
+
+        setPickMode(null);
+        triggerRecalc();
+    }, [pickMode, triggerRecalc]);
+
+    useEffect(() => {
+        if (recalcTrigger === 0) return;
+        if (!originCoords || !destinationCoords) return;
+        if (hasEmptyWaypoint || duplicateLocationExists) return;
+
+        let cancelled = false;
+
+        const recalc = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const res = await fetch("/api/trip-plan", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        origin: originCoords,
+                        destination: destinationCoords,
+                        waypoints: waypoints
+                            .map((wp) => wp.coords)
+                            .filter((c): c is Coordinates => !!c),
+                        vehicleRangeKm: parseInt(vehicleRange, 10) || DEFAULT_RANGE_KM,
+                        chargerType: chargerType === "any" ? undefined : chargerType,
+                        corridorKm: parseFloat(corridorKm) || 7,
+                    }),
+                });
+                if (cancelled) return;
+                const data = await res.json();
+                if (!res.ok) {
+                    setResult(null);
+                    setError(data.error || "Failed to recalculate route.");
+                } else {
+                    setResult(data as TripPlanResponse);
+                }
+            } catch (err) {
+                if (cancelled) return;
+                setResult(null);
+                setError(err instanceof Error ? err.message : "Failed to recalculate route.");
+            } finally {
+                if (!cancelled) {
+                    setHasSearched(true);
+                    setLoading(false);
+                }
+            }
+        };
+
+        void recalc();
+        return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [recalcTrigger]);
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -716,10 +853,25 @@ export default function TripPlanner() {
 
                                 <form onSubmit={handleSearch} className="space-y-5">
                                     <div className="rounded-xl border border-dashed p-3">
+                                        <p className="mb-2 text-[11px] text-muted-foreground">
+                                            Search a location or pin it accurately on the map.
+                                        </p>
                                         <div className="flex items-start gap-2">
                                             <CircleDot className="mt-0.5 h-4 w-4 text-emerald-600" />
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-xs font-medium text-muted-foreground">Origin</p>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <p className="text-xs font-medium text-muted-foreground">Origin</p>
+                                                    <Button
+                                                        type="button"
+                                                        variant={pickMode === "origin" ? "default" : "ghost"}
+                                                        size="sm"
+                                                        className="h-6 gap-1 px-2 text-[11px]"
+                                                        onClick={() => setPickMode(pickMode === "origin" ? null : "origin")}
+                                                    >
+                                                        <Crosshair className="h-3 w-3" />
+                                                        {pickMode === "origin" ? "Cancel" : "Pick on Map"}
+                                                    </Button>
+                                                </div>
                                                 <PlaceAutocomplete
                                                     value={originText}
                                                     placeholder="e.g. Colombo Fort"
@@ -749,6 +901,11 @@ export default function TripPlanner() {
                                                         onRemove={() => removeWaypoint(wp.id)}
                                                         onMoveUp={() => moveWaypoint(wp.id, -1)}
                                                         onMoveDown={() => moveWaypoint(wp.id, 1)}
+                                                        pickMode={pickMode}
+                                                        onPickOnMap={() => {
+                                                            const target: PickMode = `waypoint-${wp.id}`;
+                                                            setPickMode(pickMode === target ? null : target);
+                                                        }}
                                                     />
                                                 ))}
                                             </div>
@@ -777,7 +934,19 @@ export default function TripPlanner() {
                                         <div className="flex items-start gap-2">
                                             <MapPin className="mt-0.5 h-4 w-4 text-rose-600" />
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-xs font-medium text-muted-foreground">Destination</p>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <p className="text-xs font-medium text-muted-foreground">Destination</p>
+                                                    <Button
+                                                        type="button"
+                                                        variant={pickMode === "destination" ? "default" : "ghost"}
+                                                        size="sm"
+                                                        className="h-6 gap-1 px-2 text-[11px]"
+                                                        onClick={() => setPickMode(pickMode === "destination" ? null : "destination")}
+                                                    >
+                                                        <Crosshair className="h-3 w-3" />
+                                                        {pickMode === "destination" ? "Cancel" : "Pick on Map"}
+                                                    </Button>
+                                                </div>
                                                 <PlaceAutocomplete
                                                     value={destinationText}
                                                     placeholder="e.g. Kandy Clock Tower"
@@ -990,6 +1159,23 @@ export default function TripPlanner() {
                                         destination={mapDestination}
                                         waypoints={mapWaypoints}
                                         highlightedStationIds={highlightedStationIds}
+                                        pickMode={pickMode}
+                                        onOriginDrag={handleOriginDrag}
+                                        onDestinationDrag={handleDestinationDrag}
+                                        onWaypointDrag={handleWaypointDrag}
+                                        onMapPick={handleMapPick}
+                                    />
+                                ) : (mapOrigin || mapDestination || pickMode) ? (
+                                    <MapView
+                                        className="h-[420px]"
+                                        origin={mapOrigin}
+                                        destination={mapDestination}
+                                        waypoints={mapWaypoints}
+                                        pickMode={pickMode}
+                                        onOriginDrag={handleOriginDrag}
+                                        onDestinationDrag={handleDestinationDrag}
+                                        onWaypointDrag={handleWaypointDrag}
+                                        onMapPick={handleMapPick}
                                     />
                                 ) : (
                                     <div className="flex h-[420px] flex-col items-center justify-center bg-muted/20 px-6 text-center">
@@ -1283,6 +1469,8 @@ function WaypointRow({
     onRemove,
     onMoveUp,
     onMoveDown,
+    pickMode,
+    onPickOnMap,
 }: {
     index: number;
     total: number;
@@ -1292,7 +1480,11 @@ function WaypointRow({
     onRemove: () => void;
     onMoveUp: () => void;
     onMoveDown: () => void;
+    pickMode?: PickMode;
+    onPickOnMap?: () => void;
 }) {
+    const isPickingThis = pickMode === `waypoint-${waypoint.id}`;
+
     return (
         <div className="relative">
             <div className="flex items-start gap-2">
@@ -1308,6 +1500,20 @@ function WaypointRow({
                             </span>
                         </p>
                         <div className="flex items-center gap-0.5">
+                            {onPickOnMap && (
+                                <button
+                                    type="button"
+                                    onClick={onPickOnMap}
+                                    aria-label="Pick stop on map"
+                                    className={`rounded-md p-1 transition-colors ${
+                                        isPickingThis
+                                            ? "bg-primary/10 text-primary"
+                                            : "text-muted-foreground hover:bg-slate-100 hover:text-foreground"
+                                    }`}
+                                >
+                                    <Crosshair className="h-3.5 w-3.5" />
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={onMoveUp}
