@@ -30,6 +30,11 @@ export interface MapViewProps {
     destination?: MapPointWithLabel;
     waypoints?: MapPointWithLabel[];
     highlightedStationIds?: string[];
+    featuredStationIds?: {
+        nearest?: string;
+        cheapest?: string;
+        recommended?: string;
+    };
     className?: string;
     pickMode?: PickMode;
     onOriginDrag?: (lat: number, lng: number) => void;

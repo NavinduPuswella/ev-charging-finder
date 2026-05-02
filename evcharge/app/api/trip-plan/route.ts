@@ -13,24 +13,95 @@ interface TripPlanRequestBody {
     vehicleRangeKm: number;
     chargerType?: string;
     corridorKm?: number;
+    batteryCapacityKwh?: number;
+    energyConsumptionKwhPerKm?: number;
+    currentBatteryPercent?: number;
+    targetBatteryPercent?: number;
 }
 
 interface RouteStation {
     _id: string;
+    stationId: string;
     name: string;
+    stationName: string;
     city: string;
+    address: string;
+    latitude: number;
+    longitude: number;
     chargerType: string;
+    chargerTypes: string;
     pricePerKwh: number;
+    chargingRatePerKwh: number;
+    reservationFeePerHour: number;
     rating: number;
     availableNow: number;
+    availableSlots: number;
     totalChargingPoints: number;
     availabilityStatus: "Available" | "Limited Availability" | "Fully Booked" | "Closed";
     location: { latitude: number; longitude: number };
     distanceToRouteKm: number;
+    distanceFromRouteKm: number;
+    distanceFromOriginKm: number;
     distanceFromStartKm: number;
     progress: number;
     estimatedWaitMinutes: number;
     estimatedChargeCostLkr: number;
+    estimatedKwhNeeded: number;
+    estimatedBookingHours: number;
+    estimatedChargingCost: number;
+    estimatedReservationCost: number;
+    totalEstimatedCost: number;
+    isAvailable: boolean;
+    connectorMatch: boolean;
+    badges: string[];
+    recommendationScore: number;
+}
+
+const DEFAULT_BATTERY_CAPACITY_KWH = 40;
+const DEFAULT_ENERGY_CONSUMPTION_KWH_PER_KM = 0.15;
+const DEFAULT_CURRENT_BATTERY_PERCENT = 80;
+const DEFAULT_TARGET_BATTERY_PERCENT = 20;
+
+function clamp(value: number, min: number, max: number) {
+    return Math.min(max, Math.max(min, value));
+}
+
+function normalizeInverse(value: number, min: number, max: number) {
+    if (!Number.isFinite(value)) return 0;
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return 1;
+    return clamp(1 - (value - min) / (max - min), 0, 1);
+}
+
+function hasConnectorMatch(stationConnectorType: string, selectedConnectorType?: string) {
+    if (!selectedConnectorType) return true;
+    const stationTypes = stationConnectorType
+        .split(",")
+        .map((type) => type.trim().toLowerCase())
+        .filter(Boolean);
+    return stationTypes.includes(selectedConnectorType.trim().toLowerCase());
+}
+
+function compareByNearestRules(a: RouteStation, b: RouteStation) {
+    if (Math.abs(a.distanceFromRouteKm - b.distanceFromRouteKm) > 0.001) {
+        return a.distanceFromRouteKm - b.distanceFromRouteKm;
+    }
+    if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
+    if (a.connectorMatch !== b.connectorMatch) return a.connectorMatch ? -1 : 1;
+    if (Math.abs(a.totalEstimatedCost - b.totalEstimatedCost) > 0.01) {
+        return a.totalEstimatedCost - b.totalEstimatedCost;
+    }
+    return b.rating - a.rating;
+}
+
+function compareByCheapestRules(a: RouteStation, b: RouteStation) {
+    if (Math.abs(a.totalEstimatedCost - b.totalEstimatedCost) > 0.01) {
+        return a.totalEstimatedCost - b.totalEstimatedCost;
+    }
+    if (Math.abs(a.distanceFromRouteKm - b.distanceFromRouteKm) > 0.001) {
+        return a.distanceFromRouteKm - b.distanceFromRouteKm;
+    }
+    if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
+    return b.rating - a.rating;
 }
 
 function getAvailabilityLabel(
@@ -154,7 +225,18 @@ async function fetchRouteFromOsrm(points: RoutePoint[]) {
 export async function POST(request: Request) {
     try {
         const body = (await request.json()) as TripPlanRequestBody;
-        const { origin, destination, waypoints = [], vehicleRangeKm, chargerType, corridorKm = 7 } = body;
+        const {
+            origin,
+            destination,
+            waypoints = [],
+            vehicleRangeKm,
+            chargerType,
+            corridorKm = 7,
+            batteryCapacityKwh = DEFAULT_BATTERY_CAPACITY_KWH,
+            energyConsumptionKwhPerKm = DEFAULT_ENERGY_CONSUMPTION_KWH_PER_KM,
+            currentBatteryPercent = DEFAULT_CURRENT_BATTERY_PERCENT,
+            targetBatteryPercent = DEFAULT_TARGET_BATTERY_PERCENT,
+        } = body;
 
         if (!origin || !destination) {
             return NextResponse.json({ error: "Origin and destination are required." }, { status: 400 });
@@ -187,6 +269,13 @@ export async function POST(request: Request) {
         const stations = await Station.find(filter);
         const occupancyMap = await getCurrentOccupancyMap(stations.map((s) => String(s._id)));
 
+        const estimatedEnergyNeededKwhRaw = distanceKm * energyConsumptionKwhPerKm;
+        const estimatedEnergyNeededKwh = Math.max(0, estimatedEnergyNeededKwhRaw);
+        const batteryWindowPercent = clamp(currentBatteryPercent - targetBatteryPercent, 0, 100);
+        const availableBatteryWindowKwh = (batteryCapacityKwh * batteryWindowPercent) / 100;
+        const usableEnergyKwh = Math.max(estimatedEnergyNeededKwh, availableBatteryWindowKwh, 1);
+        const estimatedBookingHours = clamp(Math.ceil(usableEnergyKwh / 25), 1, 5);
+
         const stationsOnRoute: RouteStation[] = stations
             .map((stationDoc) => {
                 const station = stationDoc.toObject();
@@ -195,24 +284,50 @@ export async function POST(request: Request) {
                 const isClosed = station.status === "INACTIVE" || station.status === "MAINTENANCE";
                 const availableNow = isClosed ? 0 : Math.max(totalChargingPoints - occupiedNow, 0);
                 const estimatedWaitMinutes = estimateWaitMinutes(totalChargingPoints, occupiedNow, availableNow);
-                const typicalTopUpKwh = Math.max(12, Math.min(45, vehicleRangeKm * 0.12));
+                const chargingRatePerKwh = Number.isFinite(Number(station.pricePerKwh))
+                    ? Number(station.pricePerKwh)
+                    : 0;
+                const reservationFeePerHour = Number.isFinite(Number(station.reservationFeePerHour))
+                    ? Number(station.reservationFeePerHour)
+                    : 0;
                 const point = {
                     lat: station.location.latitude,
                     lng: station.location.longitude,
                 };
 
                 const distanceToRouteKm = getDistanceToRouteKm(point, routePath);
+                const distanceFromOriginKm = haversineKm(
+                    origin.lat,
+                    origin.lng,
+                    station.location.latitude,
+                    station.location.longitude
+                );
                 const closestIndex = getClosestPointIndex(point, routePath);
                 const progress = routePath.length > 1 ? closestIndex / (routePath.length - 1) : 0;
+                const connectorMatch = hasConnectorMatch(station.chargerType, chargerType);
+                const estimatedChargingCost = Math.round(usableEnergyKwh * chargingRatePerKwh);
+                const estimatedReservationCost = Math.round(estimatedBookingHours * reservationFeePerHour);
+                const totalEstimatedCost = estimatedChargingCost + estimatedReservationCost;
+                const isAvailable = availableNow > 0 && !isClosed;
+                const stationId = String(station._id);
 
                 return {
-                    _id: String(station._id),
+                    _id: stationId,
+                    stationId,
                     name: station.name,
+                    stationName: station.name,
                     city: station.city,
+                    address: station.address || "",
+                    latitude: station.location.latitude,
+                    longitude: station.location.longitude,
                     chargerType: station.chargerType,
-                    pricePerKwh: station.pricePerKwh,
+                    chargerTypes: station.chargerType,
+                    pricePerKwh: chargingRatePerKwh,
+                    chargingRatePerKwh,
+                    reservationFeePerHour,
                     rating: station.rating || 0,
                     availableNow,
+                    availableSlots: availableNow,
                     totalChargingPoints,
                     availabilityStatus: getAvailabilityLabel(
                         availableNow,
@@ -221,14 +336,93 @@ export async function POST(request: Request) {
                     ),
                     location: station.location,
                     distanceToRouteKm,
+                    distanceFromRouteKm: distanceToRouteKm,
+                    distanceFromOriginKm,
                     distanceFromStartKm: progress * distanceKm,
                     progress,
                     estimatedWaitMinutes,
-                    estimatedChargeCostLkr: Math.round(station.pricePerKwh * typicalTopUpKwh),
+                    estimatedChargeCostLkr: estimatedChargingCost,
+                    estimatedKwhNeeded: Math.round(usableEnergyKwh * 100) / 100,
+                    estimatedBookingHours,
+                    estimatedChargingCost,
+                    estimatedReservationCost,
+                    totalEstimatedCost,
+                    isAvailable,
+                    connectorMatch,
+                    badges: [],
+                    recommendationScore: 0,
                 };
             })
             .filter((station) => station.distanceToRouteKm <= corridorKm)
             .sort((a, b) => a.distanceFromStartKm - b.distanceFromStartKm);
+
+        const costValues = stationsOnRoute.map((station) => station.totalEstimatedCost);
+        const distanceValues = stationsOnRoute.map((station) => station.distanceFromRouteKm);
+        const minCost = costValues.length ? Math.min(...costValues) : 0;
+        const maxCost = costValues.length ? Math.max(...costValues) : 1;
+        const minDistance = distanceValues.length ? Math.min(...distanceValues) : 0;
+        const maxDistance = distanceValues.length ? Math.max(...distanceValues) : 1;
+
+        for (const station of stationsOnRoute) {
+            const distanceScore = normalizeInverse(station.distanceFromRouteKm, minDistance, maxDistance);
+            const costScore = normalizeInverse(station.totalEstimatedCost, minCost, maxCost);
+            const availabilityScore = station.isAvailable ? 1 : 0;
+            const connectorScore = station.connectorMatch ? 1 : 0;
+            const ratingScore = clamp(station.rating / 5, 0, 1);
+            station.recommendationScore =
+                distanceScore * 0.3 +
+                costScore * 0.3 +
+                availabilityScore * 0.2 +
+                connectorScore * 0.15 +
+                ratingScore * 0.05;
+        }
+
+        const nearestStation = [...stationsOnRoute].sort(compareByNearestRules)[0] || null;
+        const cheapestStation = [...stationsOnRoute].sort(compareByCheapestRules)[0] || null;
+
+        const availableAndMatchingStations = stationsOnRoute.filter(
+            (station) => station.isAvailable && station.connectorMatch
+        );
+        const availableStations = stationsOnRoute.filter((station) => station.isAvailable);
+        const recommendationPool =
+            availableAndMatchingStations.length > 0
+                ? availableAndMatchingStations
+                : availableStations.length > 0
+                    ? availableStations
+                    : stationsOnRoute;
+        const recommendedStation =
+            [...recommendationPool].sort((a, b) => {
+                if (Math.abs(b.recommendationScore - a.recommendationScore) > 0.0001) {
+                    return b.recommendationScore - a.recommendationScore;
+                }
+                if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
+                if (a.connectorMatch !== b.connectorMatch) return a.connectorMatch ? -1 : 1;
+                if (Math.abs(a.totalEstimatedCost - b.totalEstimatedCost) > 0.01) {
+                    return a.totalEstimatedCost - b.totalEstimatedCost;
+                }
+                if (Math.abs(a.distanceFromRouteKm - b.distanceFromRouteKm) > 0.001) {
+                    return a.distanceFromRouteKm - b.distanceFromRouteKm;
+                }
+                return b.rating - a.rating;
+            })[0] || null;
+
+        for (const station of stationsOnRoute) {
+            const badges: string[] = [];
+            if (nearestStation && station._id === nearestStation._id) badges.push("Nearest");
+            if (cheapestStation && station._id === cheapestStation._id) badges.push("Cheapest");
+            if (recommendedStation && station._id === recommendedStation._id) badges.push("Recommended");
+            if (station.isAvailable) badges.push("Available");
+            if (station.connectorMatch) badges.push("Connector Match");
+            station.badges = badges;
+        }
+
+        const recommendationReason = recommendedStation
+            ? `Recommended because it is ${recommendedStation.distanceFromRouteKm.toFixed(1)} km from your route, ${
+                recommendedStation.isAvailable
+                    ? "has available"
+                    : "currently has limited availability for"
+            } ${recommendedStation.chargerType} chargers, and offers an estimated total stop cost of LKR ${recommendedStation.totalEstimatedCost.toLocaleString()}.`
+            : "No station recommendation could be generated for this route.";
 
         const safeRangeKm = Math.max(vehicleRangeKm * 0.8, 20);
         const plannedStops: RouteStation[] = [];
@@ -285,8 +479,19 @@ export async function POST(request: Request) {
             .map((id) => stationById.get(id))
             .filter((station): station is RouteStation => Boolean(station));
         const finalRecommendedStops = aiRecommendedStops.length > 0 ? aiRecommendedStops : plannedStops;
+        const estimatedTripChargingCost = recommendedStation
+            ? recommendedStation.totalEstimatedCost
+            : Math.round(usableEnergyKwh * (stationsOnRoute[0]?.chargingRatePerKwh || 0));
 
         return NextResponse.json({
+            routeDistanceKm: Math.round(distanceKm * 10) / 10,
+            routeDurationMinutes: Math.round(durationMinutes),
+            estimatedEnergyNeededKwh: Math.round(estimatedEnergyNeededKwh * 100) / 100,
+            estimatedTripChargingCost,
+            nearestStation,
+            cheapestStation,
+            recommendedStation,
+            recommendationReason,
             route: {
                 distanceKm: Math.round(distanceKm * 10) / 10,
                 durationMinutes: Math.round(durationMinutes),

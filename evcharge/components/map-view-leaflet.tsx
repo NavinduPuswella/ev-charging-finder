@@ -24,6 +24,11 @@ interface MapViewLeafletProps {
     destination?: MapPointWithLabel;
     waypoints?: MapPointWithLabel[];
     highlightedStationIds?: string[];
+    featuredStationIds?: {
+        nearest?: string;
+        cheapest?: string;
+        recommended?: string;
+    };
     className?: string;
     pickMode?: PickMode;
     onOriginDrag?: (lat: number, lng: number) => void;
@@ -47,6 +52,19 @@ const highlightedMarkerIcon = new L.DivIcon({
     iconSize: [20, 20],
     iconAnchor: [10, 10],
 });
+
+function createFeaturedMarkerIcon(label: string, color: string) {
+    return new L.DivIcon({
+        html: `<div style="background:${color};color:white;border-radius:999px;min-width:26px;height:26px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid white;box-shadow:0 6px 14px rgba(15,23,42,.35);">${label}</div>`,
+        className: "",
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+    });
+}
+
+const nearestMarkerIcon = createFeaturedMarkerIcon("N", "#2563eb");
+const cheapestMarkerIcon = createFeaturedMarkerIcon("C", "#16a34a");
+const recommendedMarkerIcon = createFeaturedMarkerIcon("R", "#7c3aed");
 
 const originIcon = new L.DivIcon({
     html: `<div style="background:#16a34a;color:white;border-radius:999px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:3px solid white;box-shadow:0 4px 12px rgba(22,163,74,.4);cursor:grab;">S</div>`,
@@ -132,6 +150,7 @@ export default function MapViewLeaflet({
     destination,
     waypoints = [],
     highlightedStationIds = [],
+    featuredStationIds,
     className = "",
     pickMode,
     onOriginDrag,
@@ -273,16 +292,44 @@ export default function MapViewLeaflet({
                 {validStations.map((station) => {
                     const isHighlighted = highlightedStationIds.includes(station._id);
                     const dotColor = getStatusColor(station.availabilityStatus);
+                    const markerLabels: string[] = [];
+                    if (featuredStationIds?.nearest === station._id) markerLabels.push("N");
+                    if (featuredStationIds?.cheapest === station._id) markerLabels.push("C");
+                    if (featuredStationIds?.recommended === station._id) markerLabels.push("R");
+                    const featuredLabel = markerLabels.join("/");
+                    const stationMarkerIcon = featuredLabel
+                        ? featuredLabel === "N"
+                            ? nearestMarkerIcon
+                            : featuredLabel === "C"
+                                ? cheapestMarkerIcon
+                                : featuredLabel === "R"
+                                    ? recommendedMarkerIcon
+                                    : createFeaturedMarkerIcon(
+                                        featuredLabel,
+                                        featuredLabel.includes("R")
+                                            ? "#7c3aed"
+                                            : featuredLabel.includes("C")
+                                                ? "#16a34a"
+                                                : "#2563eb"
+                                    )
+                        : isHighlighted
+                            ? highlightedMarkerIcon
+                            : markerIcon;
 
                     return (
                         <Marker
                             key={station._id}
                             position={[Number(station.location.latitude), Number(station.location.longitude)]}
-                            icon={isHighlighted ? highlightedMarkerIcon : markerIcon}
+                            icon={stationMarkerIcon}
                         >
                             <Popup>
                                 <div className="space-y-1 text-sm">
                                     <p className="font-semibold">{station.name}</p>
+                                    {featuredLabel && (
+                                        <p className="text-xs font-medium text-primary">
+                                            Marker: {featuredLabel}
+                                        </p>
+                                    )}
                                     {station.city && <p className="text-muted-foreground">{station.city}</p>}
                                     {station.availabilityStatus && (
                                         <div className="inline-flex items-center gap-1">

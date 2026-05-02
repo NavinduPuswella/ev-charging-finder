@@ -18,7 +18,7 @@ import {
     Clock3, Gauge, Bot, Coins, ArrowRight, CircleDot, SlidersHorizontal,
     Plus, Trash2, ArrowUp, ArrowDown, Receipt,
 } from "lucide-react";
-import { formatChargingRate } from "@/lib/pricing";
+import { formatChargingRate, formatReservationFeePerHour } from "@/lib/pricing";
 
 const CHARGER_TYPES = ["CCS", "CHAdeMO", "Type1", "Type2", "Tesla"];
 const MAX_WAYPOINTS = 3;
@@ -66,22 +66,50 @@ interface AutocompletePlace {
 
 interface RouteStation {
     _id: string;
+    stationId: string;
     name: string;
+    stationName: string;
     city: string;
+    address: string;
+    latitude: number;
+    longitude: number;
     chargerType: string;
+    chargerTypes: string;
     pricePerKwh: number;
+    chargingRatePerKwh: number;
+    reservationFeePerHour: number;
     rating: number;
     availableNow: number;
+    availableSlots: number;
     totalChargingPoints: number;
     availabilityStatus: "Available" | "Limited Availability" | "Fully Booked" | "Closed";
     location: { latitude: number; longitude: number };
     distanceToRouteKm: number;
+    distanceFromRouteKm: number;
+    distanceFromOriginKm: number;
     distanceFromStartKm: number;
     estimatedWaitMinutes: number;
     estimatedChargeCostLkr: number;
+    estimatedKwhNeeded: number;
+    estimatedBookingHours: number;
+    estimatedChargingCost: number;
+    estimatedReservationCost: number;
+    totalEstimatedCost: number;
+    isAvailable: boolean;
+    connectorMatch: boolean;
+    badges: string[];
+    recommendationScore: number;
 }
 
 interface TripPlanResponse {
+    routeDistanceKm?: number;
+    routeDurationMinutes?: number;
+    estimatedEnergyNeededKwh?: number;
+    estimatedTripChargingCost?: number;
+    nearestStation?: RouteStation | null;
+    cheapestStation?: RouteStation | null;
+    recommendedStation?: RouteStation | null;
+    recommendationReason?: string;
     route: {
         distanceKm: number;
         durationMinutes: number;
@@ -110,6 +138,8 @@ interface TripPlanResponse {
         }>;
     };
 }
+
+type StationSortMode = "recommended" | "nearest" | "cheapest" | "highestRated" | "availableOnly";
 
 const SRI_LANKA_CENTER = { lat: 7.8731, lon: 80.7718 };
 const AUTOCOMPLETE_DEBOUNCE_MS = 320;
@@ -430,6 +460,7 @@ export default function TripPlanner() {
     const [loading, setLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
     const [result, setResult] = useState<TripPlanResponse | null>(null);
+    const [stationSortMode, setStationSortMode] = useState<StationSortMode>("recommended");
     const [error, setError] = useState<string | null>(null);
     const [geoLoading, setGeoLoading] = useState(false);
     const [pickMode, setPickMode] = useState<PickMode>(null);
@@ -793,10 +824,53 @@ export default function TripPlanner() {
         [waypoints]
     );
 
-    const highlightedStationIds = useMemo(
-        () => result?.recommendedStops.map((station) => station._id) || [],
-        [result]
+    const nearestStation = result?.nearestStation ?? null;
+    const cheapestStation = result?.cheapestStation ?? null;
+    const recommendedStation = result?.recommendedStation ?? null;
+
+    const featuredStationIds = useMemo(
+        () => ({
+            nearest: nearestStation?._id,
+            cheapest: cheapestStation?._id,
+            recommended: recommendedStation?._id,
+        }),
+        [nearestStation?._id, cheapestStation?._id, recommendedStation?._id]
     );
+
+    const highlightedStationIds = useMemo(() => {
+        const ids = new Set<string>();
+        if (featuredStationIds.nearest) ids.add(featuredStationIds.nearest);
+        if (featuredStationIds.cheapest) ids.add(featuredStationIds.cheapest);
+        if (featuredStationIds.recommended) ids.add(featuredStationIds.recommended);
+        return [...ids];
+    }, [featuredStationIds]);
+
+    const sortedStations = useMemo(() => {
+        if (!result) return [];
+        const base = [...result.stationsOnRoute];
+        if (stationSortMode === "availableOnly") {
+            return base
+                .filter((station) => station.isAvailable)
+                .sort((a, b) => b.recommendationScore - a.recommendationScore);
+        }
+        if (stationSortMode === "nearest") {
+            return base.sort((a, b) => a.distanceFromRouteKm - b.distanceFromRouteKm);
+        }
+        if (stationSortMode === "cheapest") {
+            return base.sort((a, b) => a.totalEstimatedCost - b.totalEstimatedCost);
+        }
+        if (stationSortMode === "highestRated") {
+            return base.sort((a, b) => b.rating - a.rating);
+        }
+        return base.sort((a, b) => b.recommendationScore - a.recommendationScore);
+    }, [result, stationSortMode]);
+
+    const routeDistanceValue = result?.routeDistanceKm ?? result?.route.distanceKm ?? 0;
+    const routeDurationValue = result?.routeDurationMinutes ?? result?.route.durationMinutes ?? 0;
+    const estimatedTripChargingCost =
+        result?.estimatedTripChargingCost ??
+        recommendedStation?.totalEstimatedCost ??
+        0;
     const hasPlannedOnce = loading || hasSearched;
     const hasRoute = !!result && !loading;
 
@@ -1159,6 +1233,7 @@ export default function TripPlanner() {
                                         destination={mapDestination}
                                         waypoints={mapWaypoints}
                                         highlightedStationIds={highlightedStationIds}
+                                        featuredStationIds={featuredStationIds}
                                         pickMode={pickMode}
                                         onOriginDrag={handleOriginDrag}
                                         onDestinationDrag={handleDestinationDrag}
@@ -1220,19 +1295,19 @@ export default function TripPlanner() {
                                         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                                             <StatCard
                                                 label="Route Distance"
-                                                value={`${result.route.distanceKm} km`}
+                                                value={`${routeDistanceValue} km`}
                                                 tone="primary"
                                                 icon={<Route className="h-4 w-4" />}
                                             />
                                             <StatCard
                                                 label="Estimated Duration"
-                                                value={`${result.route.durationMinutes} min`}
+                                                value={`${routeDurationValue} min`}
                                                 tone="blue"
                                                 icon={<Clock3 className="h-4 w-4" />}
                                             />
                                             <StatCard
-                                                label="Suggested Stops"
-                                                value={`${result.recommendedStops.length}`}
+                                                label="Estimated Energy Need"
+                                                value={`${(result.estimatedEnergyNeededKwh ?? 0).toFixed(1)} kWh`}
                                                 tone="emerald"
                                                 icon={<Zap className="h-4 w-4" />}
                                             />
@@ -1244,12 +1319,49 @@ export default function TripPlanner() {
                                             />
                                         </div>
 
+                                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                                            <SummaryStationCard
+                                                title="Nearest Charging Station"
+                                                station={nearestStation}
+                                                subtitle={nearestStation
+                                                    ? `${nearestStation.distanceFromRouteKm.toFixed(1)} km from route`
+                                                    : "No nearby station"}
+                                            />
+                                            <SummaryStationCard
+                                                title="Cheapest Charging Station"
+                                                station={cheapestStation}
+                                                subtitle={cheapestStation
+                                                    ? `${formatChargingRate(cheapestStation.chargingRatePerKwh)}`
+                                                    : "No station found"}
+                                            />
+                                            <SummaryStationCard
+                                                title="Recommended Charging Station"
+                                                station={recommendedStation}
+                                                subtitle={recommendedStation
+                                                    ? `Score ${(recommendedStation.recommendationScore * 100).toFixed(0)} / 100`
+                                                    : "No recommendation"}
+                                            />
+                                            <StatCard
+                                                label="Estimated Trip Charging Cost"
+                                                value={`LKR ${estimatedTripChargingCost.toLocaleString()}`}
+                                                tone="emerald"
+                                                icon={null}
+                                            />
+                                        </div>
+
                                         <div className={`rounded-xl border p-4 ${result.safety.canReachDestination ? "border-primary/40 bg-primary/5" : "border-orange-300 bg-orange-50/60"}`}>
                                             <p className="text-sm font-semibold">
                                                 {result.safety.canReachDestination ? "Trip is feasible with this plan" : "Trip may not be guaranteed"}
                                             </p>
                                             <p className="mt-1 text-sm text-muted-foreground">{result.safety.note}</p>
                                         </div>
+
+                                        {result.recommendationReason && (
+                                            <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+                                                <p className="text-sm font-semibold text-emerald-900">Why this station is recommended</p>
+                                                <p className="mt-1 text-sm text-emerald-800">{result.recommendationReason}</p>
+                                            </div>
+                                        )}
 
                                         {result.aiOptimization && (
                                             <div className={`rounded-xl border p-4 ${result.aiOptimization.enabled ? "border-blue-300 bg-blue-50/60" : "border-slate-300 bg-slate-50"}`}>
@@ -1269,7 +1381,7 @@ export default function TripPlanner() {
                                         {result.recommendedStops.length > 0 && (
                                             <section>
                                                 <div className="mb-3 flex items-center justify-between gap-2">
-                                                    <h3 className="font-semibold">Suggested charging stops</h3>
+                                                    <h3 className="font-semibold">AI suggested charging stops</h3>
                                                     <Badge variant="secondary">{result.recommendedStops.length} recommended</Badge>
                                                 </div>
                                                 <div className="grid gap-4 xl:grid-cols-2">
@@ -1281,12 +1393,29 @@ export default function TripPlanner() {
                                         )}
 
                                         <section>
-                                            <div className="mb-3 flex items-center justify-between gap-2">
+                                            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                                                 <h3 className="font-semibold">All stations on route</h3>
-                                                <Badge variant="outline">{result.stationsOnRoute.length} stations</Badge>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant="outline">{sortedStations.length} shown</Badge>
+                                                    <Select
+                                                        value={stationSortMode}
+                                                        onValueChange={(value) => setStationSortMode(value as StationSortMode)}
+                                                    >
+                                                        <SelectTrigger className="h-9 w-[210px] text-xs sm:text-sm">
+                                                            <SelectValue placeholder="Sort stations" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="recommended">Recommended</SelectItem>
+                                                            <SelectItem value="nearest">Nearest</SelectItem>
+                                                            <SelectItem value="cheapest">Cheapest</SelectItem>
+                                                            <SelectItem value="highestRated">Highest Rated</SelectItem>
+                                                            <SelectItem value="availableOnly">Available Only</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
                                             </div>
 
-                                            {result.stationsOnRoute.length === 0 ? (
+                                            {sortedStations.length === 0 ? (
                                                 <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16">
                                                     <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-muted">
                                                         <SearchX className="h-6 w-6 text-muted-foreground" />
@@ -1298,7 +1427,7 @@ export default function TripPlanner() {
                                                 </div>
                                             ) : (
                                                 <div className="grid gap-4 xl:grid-cols-2">
-                                                    {result.stationsOnRoute.map((station, index) => (
+                                                    {sortedStations.map((station, index) => (
                                                         <RouteStopCard key={station._id} station={station} index={index} />
                                                     ))}
                                                 </div>
@@ -1379,8 +1508,30 @@ function StatCard({
     );
 }
 
+function SummaryStationCard({
+    title,
+    station,
+    subtitle,
+}: {
+    title: string;
+    station: RouteStation | null;
+    subtitle: string;
+}) {
+    return (
+        <Card className="border-slate-200 bg-slate-50/70">
+            <CardContent className="p-4">
+                <div className="mb-2">
+                    <p className="text-xs text-muted-foreground">{title}</p>
+                </div>
+                <p className="truncate text-base font-semibold">{station?.name || "—"}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+            </CardContent>
+        </Card>
+    );
+}
+
 function RouteStopCard({ station, index }: { station: RouteStation; index: number }) {
-    const hasAvailable = station.availableNow > 0;
+    const hasAvailable = station.isAvailable;
 
     return (
         <div
@@ -1390,12 +1541,14 @@ function RouteStopCard({ station, index }: { station: RouteStation; index: numbe
             <div className="p-4 sm:p-5">
                 <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-base font-semibold">{station.name}</h3>
+                        <h3 className="truncate text-base font-semibold">{station.stationName || station.name}</h3>
                         <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
                             <MapPin className="h-3.5 w-3.5 shrink-0" />
                             <span className="truncate">{station.city}</span>
                             <ArrowRight className="h-3 w-3" />
-                            <span className="whitespace-nowrap font-medium text-foreground">{station.distanceFromStartKm.toFixed(1)} km</span>
+                            <span className="whitespace-nowrap font-medium text-foreground">
+                                {station.distanceFromRouteKm.toFixed(1)} km off route
+                            </span>
                         </div>
                     </div>
                     <Badge
@@ -1406,41 +1559,64 @@ function RouteStopCard({ station, index }: { station: RouteStation; index: numbe
                     </Badge>
                 </div>
 
-                <div className="mb-4 flex flex-wrap gap-1.5">
-                    {station.chargerType.split(",").map((t: string) => t.trim()).filter(Boolean).map((type: string) => (
-                        <span key={type} className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                            <Zap className="h-2.5 w-2.5" /> {type}
-                        </span>
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                    {station.badges.map((badge) => (
+                        <Badge key={badge} variant={badge === "Recommended" ? "default" : "secondary"}>
+                            {badge}
+                        </Badge>
                     ))}
+                </div>
+
+                <div className="mb-4 flex flex-wrap gap-1.5">
+                    {station.chargerType
+                        .split(",")
+                        .map((t: string) => t.trim())
+                        .filter(Boolean)
+                        .map((type: string) => (
+                            <span key={type} className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                                <Zap className="h-2.5 w-2.5" /> {type}
+                            </span>
+                        ))}
                     <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                        <Map className="h-2.5 w-2.5" /> {station.distanceToRouteKm.toFixed(1)} km off route
+                        {station.distanceFromOriginKm.toFixed(1)} km from origin
                     </span>
                 </div>
 
                 <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <MetricCell
                         label="Charging Rate"
-                        value={formatChargingRate(station.pricePerKwh)}
+                        value={formatChargingRate(station.chargingRatePerKwh)}
                         icon={<Receipt className="h-3 w-3 text-primary" />}
+                    />
+                    <MetricCell
+                        label="Reservation Fee"
+                        value={formatReservationFeePerHour(station.reservationFeePerHour)}
                     />
                     <MetricCell
                         label="Rating"
                         value={station.rating?.toFixed(1) || "—"}
                         icon={<Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />}
                     />
-                    <MetricCell label="Available" value={`${station.availableNow}/${station.totalChargingPoints}`} subLabel="points" />
-                    <MetricCell label="Wait" value={`${station.estimatedWaitMinutes} min`} icon={<Clock3 className="h-3 w-3" />} />
+                    <MetricCell label="Available" value={`${station.availableSlots}/${station.totalChargingPoints}`} subLabel="points" />
                 </div>
 
                 <div className="mb-4 rounded-lg border bg-muted/30 p-3">
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Coins className="h-3 w-3" />
-                        Estimated charging cost (paid at station)
+                        Cost breakdown
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-foreground">LKR {station.estimatedChargeCostLkr}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                        Estimate based on the station&apos;s charging rate. Online booking only charges a small reservation fee.
-                    </p>
+                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        <p>Estimated charging cost: <span className="font-semibold text-foreground">LKR {station.estimatedChargingCost.toLocaleString()}</span></p>
+                        <p>Estimated reservation cost: <span className="font-semibold text-foreground">LKR {station.estimatedReservationCost.toLocaleString()}</span></p>
+                        <p>Total estimated stop cost: <span className="font-semibold text-foreground">LKR {station.totalEstimatedCost.toLocaleString()}</span></p>
+                    </div>
+                </div>
+
+                <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <MetricCell label="Energy Need" value={`${station.estimatedKwhNeeded.toFixed(1)} kWh`} />
+                    <MetricCell label="Booking Hours" value={`${station.estimatedBookingHours} hr`} />
+                    <MetricCell label="Wait" value={`${station.estimatedWaitMinutes} min`} icon={<Clock3 className="h-3 w-3" />} />
+                    <MetricCell label="Connector Match" value={station.connectorMatch ? "Yes" : "No"} />
                 </div>
 
                 <div className="flex gap-2">
