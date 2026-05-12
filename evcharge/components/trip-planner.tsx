@@ -23,6 +23,9 @@ import { formatChargingRate, formatReservationFeePerHour } from "@/lib/pricing";
 const CHARGER_TYPES = ["CCS", "CHAdeMO", "Type1", "Type2", "Tesla"];
 const MAX_WAYPOINTS = 3;
 const DEFAULT_RANGE_KM = 250;
+const DEFAULT_START_BATTERY_PERCENT = 80;
+const DEFAULT_MIN_BATTERY_PERCENT = 20;
+const MIN_BATTERY_OPTIONS = [10, 20, 30] as const;
 
 type SavedVehicle = {
     _id: string;
@@ -101,6 +104,19 @@ interface RouteStation {
     recommendationScore: number;
 }
 
+interface BatteryAnalysis {
+    startBatteryPercent: number;
+    minBatteryPercent: number;
+    effectiveStartRangeKm: number;
+    postChargeRangeKm: number;
+    chargingStopRequired: boolean;
+    stopsAutoAdded: number;
+    firstStopStationId: string | null;
+    firstStopStationName: string | null;
+    firstStopDistanceFromOriginKm: number | null;
+    note: string;
+}
+
 interface TripPlanResponse {
     routeDistanceKm?: number;
     routeDurationMinutes?: number;
@@ -110,10 +126,13 @@ interface TripPlanResponse {
     cheapestStation?: RouteStation | null;
     recommendedStation?: RouteStation | null;
     recommendationReason?: string;
+    batteryAnalysis?: BatteryAnalysis;
     route: {
         distanceKm: number;
         durationMinutes: number;
         routePath: Array<{ lat: number; lng: number }>;
+        autoReroutedViaStops?: boolean;
+        originalDistanceKm?: number;
     };
     safety: {
         vehicleRangeKm: number;
@@ -455,6 +474,8 @@ export default function TripPlanner() {
     const [noPrimaryPick, setNoPrimaryPick] = useState<string | null>(null);
     const rangeEditedByUser = useRef(false);
     const [vehicleRange, setVehicleRange] = useState(String(DEFAULT_RANGE_KM));
+    const [startBatteryPercent, setStartBatteryPercent] = useState(DEFAULT_START_BATTERY_PERCENT);
+    const [minBatteryPercent, setMinBatteryPercent] = useState(DEFAULT_MIN_BATTERY_PERCENT);
     const [chargerType, setChargerType] = useState("any");
     const [corridorKm, setCorridorKm] = useState("7");
     const [loading, setLoading] = useState(false);
@@ -626,6 +647,27 @@ export default function TripPlanner() {
         setRecalcTrigger((n) => n + 1);
     }, []);
 
+    const continueFromStation = useCallback(
+        (stationId: string, batteryAfterCharge: number) => {
+            if (!result) return;
+            const station =
+                result.stationsOnRoute.find((s) => s._id === stationId) ||
+                result.recommendedStops.find((s) => s._id === stationId);
+            if (!station) return;
+            if (!destinationCoords) return;
+
+            setOriginCoords({ lat: station.latitude, lng: station.longitude });
+            setOriginText(`${station.name} (charged)`);
+            setWaypoints([]);
+            setStartBatteryPercent(Math.max(1, Math.min(100, Math.round(batteryAfterCharge))));
+            triggerRecalc();
+        },
+        [result, destinationCoords, triggerRecalc]
+    );
+
+    const [arrivedPromptStationId, setArrivedPromptStationId] = useState<string | null>(null);
+    const [arrivedBatteryPercent, setArrivedBatteryPercent] = useState(100);
+
     const handleOriginDrag = useCallback(async (lat: number, lng: number) => {
         setOriginCoords({ lat, lng });
         const address = await reverseGeocode(lat, lng);
@@ -712,6 +754,8 @@ export default function TripPlanner() {
                         vehicleRangeKm: parseInt(vehicleRange, 10) || DEFAULT_RANGE_KM,
                         chargerType: chargerType === "any" ? undefined : chargerType,
                         corridorKm: parseFloat(corridorKm) || 7,
+                        currentBatteryPercent: startBatteryPercent,
+                        targetBatteryPercent: minBatteryPercent,
                     }),
                 });
                 if (cancelled) return;
@@ -736,7 +780,8 @@ export default function TripPlanner() {
 
         void recalc();
         return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
+        
     }, [recalcTrigger]);
 
     const handleSearch = async (e: React.FormEvent) => {
@@ -782,6 +827,8 @@ export default function TripPlanner() {
                     vehicleRangeKm: parseInt(vehicleRange, 10) || DEFAULT_RANGE_KM,
                     chargerType: chargerType === "any" ? undefined : chargerType,
                     corridorKm: parseFloat(corridorKm) || 7,
+                    currentBatteryPercent: startBatteryPercent,
+                    targetBatteryPercent: minBatteryPercent,
                 }),
             });
 
@@ -1167,6 +1214,61 @@ export default function TripPlanner() {
                                         </Field>
                                     </div>
 
+                                    <div className="rounded-xl border bg-emerald-50/40 p-3.5">
+                                        <div className="mb-3 flex items-center justify-between gap-2">
+                                            <Label className="flex items-center gap-1.5 text-xs font-medium text-emerald-900">
+                                                <Battery className="h-3.5 w-3.5 text-emerald-700" />
+                                                Starting Battery
+                                            </Label>
+                                            <span className="rounded-md bg-white px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                                                {startBatteryPercent}%
+                                            </span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min={1}
+                                            max={100}
+                                            step={1}
+                                            value={startBatteryPercent}
+                                            onChange={(e) => setStartBatteryPercent(Number(e.target.value))}
+                                            className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-100 accent-emerald-600"
+                                        />
+                                        <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+                                            <span>1%</span>
+                                            <span>50%</span>
+                                            <span>100%</span>
+                                        </div>
+                                        <p className="mt-2 text-[11px] text-muted-foreground">
+                                            Drivable now: ~{Math.round(
+                                                ((parseInt(vehicleRange, 10) || DEFAULT_RANGE_KM) *
+                                                    Math.max(0, startBatteryPercent - minBatteryPercent)) /
+                                                    100
+                                            )}{" "}
+                                            km (keeping {minBatteryPercent}% reserve)
+                                        </p>
+
+                                        <div className="mt-3">
+                                            <Label className="mb-1.5 block text-xs font-medium text-emerald-900">
+                                                Min battery before charging stop
+                                            </Label>
+                                            <Select
+                                                value={String(minBatteryPercent)}
+                                                onValueChange={(v) => setMinBatteryPercent(Number(v))}
+                                            >
+                                                <SelectTrigger className="h-9 text-sm">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {MIN_BATTERY_OPTIONS.map((opt) => (
+                                                        <SelectItem key={opt} value={String(opt)}>
+                                                            {opt}% reserve {opt === 20 ? "(recommended)" : opt === 10 ? "(risky)" : "(safe)"}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+
                                     <Field label="Connector Type" icon={<Zap className="h-3.5 w-3.5 text-amber-500" />}>
                                         <Select value={chargerType} onValueChange={setChargerType}>
                                             <SelectTrigger className="h-11">
@@ -1356,6 +1458,144 @@ export default function TripPlanner() {
                                             <p className="mt-1 text-sm text-muted-foreground">{result.safety.note}</p>
                                         </div>
 
+                                        {result.batteryAnalysis && (
+                                            <div className={`rounded-xl border p-4 ${result.batteryAnalysis.chargingStopRequired ? "border-amber-300 bg-amber-50/70" : "border-emerald-300 bg-emerald-50/70"}`}
+                                            >
+                                                {result.batteryAnalysis.chargingStopRequired && result.batteryAnalysis.firstStopStationId && (
+                                                    <div className="mb-3 rounded-lg border border-amber-200 bg-white/70 p-2.5">
+                                                        {arrivedPromptStationId !== result.batteryAnalysis.firstStopStationId ? (
+                                                            <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                                                <div className="min-w-0">
+                                                                    <p className="text-xs text-amber-900">
+                                                                        Charged at{" "}
+                                                                        <span className="font-semibold">{result.batteryAnalysis.firstStopStationName}</span>?
+                                                                    </p>
+                                                                    {destinationText && (
+                                                                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                                                            Resume trip to:{" "}
+                                                                            <span className="font-medium text-foreground">{destinationText}</span>
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-8 shrink-0 gap-1.5 border-amber-400 bg-white text-xs text-amber-900 hover:bg-amber-50"
+                                                                    onClick={() => {
+                                                                        setArrivedBatteryPercent(100);
+                                                                        setArrivedPromptStationId(result.batteryAnalysis!.firstStopStationId!);
+                                                                    }}
+                                                                >
+                                                                    <Navigation className="h-3.5 w-3.5" />
+                                                                    I&apos;ve arrived
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-2.5">
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <p className="text-xs font-medium text-amber-900">
+                                                                        What&apos;s your battery now?
+                                                                    </p>
+                                                                    <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                                                                        {arrivedBatteryPercent}%
+                                                                    </span>
+                                                                </div>
+                                                                <input
+                                                                    type="range"
+                                                                    min={1}
+                                                                    max={100}
+                                                                    step={1}
+                                                                    value={arrivedBatteryPercent}
+                                                                    onChange={(e) => setArrivedBatteryPercent(Number(e.target.value))}
+                                                                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-100 accent-emerald-600"
+                                                                />
+                                                                <div className="flex justify-between text-[10px] text-muted-foreground">
+                                                                    <span>1%</span>
+                                                                    <span>50%</span>
+                                                                    <span>100%</span>
+                                                                </div>
+                                                                <p className="text-[11px] text-muted-foreground">
+                                                                    Drivable from here: ~{Math.round(
+                                                                        ((parseInt(vehicleRange, 10) || DEFAULT_RANGE_KM) *
+                                                                            Math.max(0, arrivedBatteryPercent - minBatteryPercent)) /
+                                                                            100
+                                                                    )}{" "}
+                                                                    km (with {minBatteryPercent}% reserve)
+                                                                </p>
+                                                                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        className="h-8 text-xs"
+                                                                        onClick={() => setArrivedPromptStationId(null)}
+                                                                    >
+                                                                        Cancel
+                                                                    </Button>
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="sm"
+                                                                        className="h-8 gap-1.5 text-xs"
+                                                                        onClick={() => {
+                                                                            const id = arrivedPromptStationId;
+                                                                            const battery = arrivedBatteryPercent;
+                                                                            setArrivedPromptStationId(null);
+                                                                            if (id) continueFromStation(id, battery);
+                                                                        }}
+                                                                    >
+                                                                        <Navigation className="h-3.5 w-3.5" />
+                                                                        Continue to {destinationText ? "destination" : "trip"}
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                <div className="flex items-start gap-2.5">
+                                                    <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${result.batteryAnalysis.chargingStopRequired ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                                                        <Battery className="h-4 w-4" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-sm font-semibold">
+                                                            {result.batteryAnalysis.chargingStopRequired
+                                                                ? `Charging stop auto-added to your route`
+                                                                : `Battery is sufficient for this trip`}
+                                                        </p>
+                                                        <p className="mt-1 text-sm text-muted-foreground">
+                                                            {result.batteryAnalysis.note}
+                                                        </p>
+                                                        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                                            <BatteryStat
+                                                                label="Starting battery"
+                                                                value={`${result.batteryAnalysis.startBatteryPercent}%`}
+                                                            />
+                                                            <BatteryStat
+                                                                label="Min reserve"
+                                                                value={`${result.batteryAnalysis.minBatteryPercent}%`}
+                                                            />
+                                                            <BatteryStat
+                                                                label="Drivable now"
+                                                                value={`${result.batteryAnalysis.effectiveStartRangeKm} km`}
+                                                            />
+                                                            <BatteryStat
+                                                                label="Stops added"
+                                                                value={`${result.batteryAnalysis.stopsAutoAdded}`}
+                                                            />
+                                                        </div>
+                                                        {result.batteryAnalysis.chargingStopRequired && result.route.autoReroutedViaStops && (
+                                                            <p className="mt-2 text-xs text-amber-800">
+                                                                Route has been automatically re-routed to pass through {result.batteryAnalysis.stopsAutoAdded} charging stop{result.batteryAnalysis.stopsAutoAdded > 1 ? "s" : ""}.
+                                                                {result.route.originalDistanceKm && result.route.originalDistanceKm !== result.routeDistanceKm && (
+                                                                    <> Detour adds {Math.max(0, Math.round(((result.routeDistanceKm ?? 0) - result.route.originalDistanceKm) * 10) / 10)} km.</>
+                                                                )}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {result.recommendationReason && (
                                             <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
                                                 <p className="text-sm font-semibold text-emerald-900">Why this station is recommended</p>
@@ -1505,6 +1745,15 @@ function StatCard({
                 <p className="text-xl font-semibold">{value}</p>
             </CardContent>
         </Card>
+    );
+}
+
+function BatteryStat({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-lg border border-white/70 bg-white/80 px-2.5 py-1.5">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+            <p className="mt-0.5 text-sm font-semibold text-foreground">{value}</p>
+        </div>
     );
 }
 

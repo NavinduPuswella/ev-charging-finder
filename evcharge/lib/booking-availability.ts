@@ -26,8 +26,7 @@ export function validateBookingDateRange(bookingDate: string): string | null {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Allow 1 day of tolerance on the lower bound so clients in timezones
-    // ahead/behind the server aren't rejected for their own "today".
+
     const minAllowed = new Date(today);
     minAllowed.setDate(minAllowed.getDate() - 1);
 
