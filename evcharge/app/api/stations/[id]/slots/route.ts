@@ -32,7 +32,7 @@ export async function POST(
         await dbConnect();
         const { id } = await params;
 
-        /
+        
         const station = await Station.findOne({ _id: id, ownerId: user.userId });
         if (!station && user.role !== "ADMIN") {
             return NextResponse.json({ error: "Station not found" }, { status: 404 });

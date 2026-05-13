@@ -58,7 +58,6 @@ export async function PUT(request: Request) {
         }
 
         const allowedStatuses = ["AVAILABLE", "LIMITED", "MAINTENANCE", "INACTIVE"];
-        /
         const updateData: Record<string, any> = {};
 
         if (typeof isApproved === "boolean") {
