@@ -235,7 +235,7 @@ export default function StationDetailPage({ params }: { params: Promise<{ id: st
 
     useEffect(() => {
         refreshStation();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        
     }, [id]);
 
     useEffect(() => {

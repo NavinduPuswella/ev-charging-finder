@@ -16,7 +16,7 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { latitude, longitude, vehicleRange, chargerType } = body;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
         const filter: any = {
             isApproved: true,
             status: { $nin: ["INACTIVE", "MAINTENANCE"] },

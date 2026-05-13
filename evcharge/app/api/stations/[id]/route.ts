@@ -114,7 +114,7 @@ export async function PUT(
             );
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        
         const updateData: Record<string, any> = {};
         if (body.name !== undefined) updateData.name = body.name;
         if (body.address !== undefined) updateData.address = body.address;

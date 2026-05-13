@@ -262,7 +262,7 @@ export async function POST(request: Request) {
         const { routePath, distanceKm, durationMinutes } = await fetchRouteFromOsrm(routePoints);
 
         await dbConnect();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        
         const filter: any = { isApproved: true };
         if (chargerType) filter.chargerType = { $regex: chargerType, $options: "i" };
 

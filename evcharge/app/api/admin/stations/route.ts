@@ -58,7 +58,7 @@ export async function PUT(request: Request) {
         }
 
         const allowedStatuses = ["AVAILABLE", "LIMITED", "MAINTENANCE", "INACTIVE"];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        /
         const updateData: Record<string, any> = {};
 
         if (typeof isApproved === "boolean") {

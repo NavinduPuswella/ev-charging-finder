@@ -257,7 +257,7 @@ export default function BookingCard({ booking, onCancel }: BookingCardProps) {
     );
 }
 
-/* ─── Details Dialog ─── */
+
 
 interface DetailsBooking {
     stationName: string;
@@ -397,7 +397,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     );
 }
 
-/* ─── Cancel Dialog ─── */
+
 
 function CancelConfirmDialog({
     open,
@@ -435,7 +435,7 @@ function CancelConfirmDialog({
     );
 }
 
-/* ─── Review Dialog ─── */
+
 
 function ReviewDialog({
     open,

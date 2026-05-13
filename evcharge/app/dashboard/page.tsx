@@ -187,7 +187,7 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-8 max-w-[1400px] mx-auto">
-            {/* Hero Greeting */}
+            
             <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-card via-card to-primary/[0.04] p-8 animate-fade-in">
                 <div className="absolute -top-24 -right-16 h-64 w-64 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
                 <div className="relative">
@@ -225,7 +225,7 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Upcoming Booking */}
+            
             <div className="animate-fade-in" style={{ animationDelay: "0.05s" }}>
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="text-lg font-semibold">Upcoming Booking</h2>
@@ -242,7 +242,7 @@ export default function DashboardPage() {
                 )}
             </div>
 
-            {/* Stat Cards */}
+            
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 animate-fade-in" style={{ animationDelay: "0.1s" }}>
                 <StatCard
                     icon={Car}
@@ -271,9 +271,9 @@ export default function DashboardPage() {
                 />
             </div>
 
-            {/* Main Content Grid */}
+            
             <div className="grid gap-6 lg:grid-cols-3 animate-fade-in" style={{ animationDelay: "0.2s" }}>
-                {/* Recent Activity */}
+                
                 <div className="lg:col-span-2 space-y-4">
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-semibold">Recent Activity</h2>
@@ -307,9 +307,9 @@ export default function DashboardPage() {
                     )}
                 </div>
 
-                {/* Right Column */}
+                
                 <div className="space-y-6">
-                    {/* Quick Actions */}
+                    
                     <div className="space-y-3">
                         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Quick Actions</h3>
                         <div className="grid gap-2">
@@ -340,7 +340,7 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
-                    {/* Vehicles */}
+                    
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">My Vehicles</h3>
@@ -373,7 +373,7 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Booking Summary Bar */}
+            
             {bookings.length > 0 && (
                 <div className="animate-fade-in" style={{ animationDelay: "0.3s" }}>
                     <Card className="border bg-muted/30">
@@ -413,7 +413,7 @@ export default function DashboardPage() {
     );
 }
 
-/* ─── Sub Components ─── */
+
 
 function SummaryPill({ dot, label, value }: { dot: string; label: string; value: string | number }) {
     return (

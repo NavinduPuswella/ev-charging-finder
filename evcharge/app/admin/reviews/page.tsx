@@ -170,7 +170,7 @@ export default function ReviewsPage() {
                 </p>
             </div>
 
-            {/* Filter Bar */}
+         
             <Card className="border-0 shadow-md">
                 <CardContent className="p-4 sm:p-5">
                     <div className="mb-3 flex items-center gap-2">
@@ -260,7 +260,7 @@ export default function ReviewsPage() {
                 </CardContent>
             </Card>
 
-            {/* Rating Summary — reflects filtered data */}
+           
             <Card className="border-0 shadow-md">
                 <CardContent className="p-6">
                     <div className="flex flex-col md:flex-row md:items-center gap-6">
@@ -313,7 +313,7 @@ export default function ReviewsPage() {
                 </CardContent>
             </Card>
 
-            {/* Review List */}
+            {
             <div>
                 <h2 className="text-lg font-semibold mb-3">
                     {hasActiveFilters ? "Filtered" : "All"} Reviews (

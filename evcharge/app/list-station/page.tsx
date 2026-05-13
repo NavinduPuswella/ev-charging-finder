@@ -327,7 +327,7 @@ export default function ListStationPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-[#f8fbf8] via-white to-[#f7faf8]">
-            {/* Hero */}
+            
             <section className="relative overflow-hidden border-b bg-slate-950 text-white">
                 <div
                     className="absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -364,7 +364,7 @@ export default function ListStationPage() {
                 </div>
             </section>
 
-            {/* Benefits */}
+            
             <section className="border-b border-slate-200 bg-white">
                 <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
                     <div className="mb-8 max-w-2xl">
@@ -396,7 +396,7 @@ export default function ListStationPage() {
                 </div>
             </section>
 
-            {/* How it works */}
+            
             <section className="border-b border-slate-200 bg-muted/40">
                 <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
                     <div className="mb-8 max-w-2xl">
@@ -423,7 +423,7 @@ export default function ListStationPage() {
                 </div>
             </section>
 
-            {/* Form */}
+        
             <section className="py-14">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="mb-8 max-w-2xl">
@@ -473,7 +473,7 @@ export default function ListStationPage() {
                             <Card className="overflow-hidden border border-slate-200 bg-white shadow-[0_18px_45px_-30px_rgba(15,23,42,0.35)] lg:col-span-3">
                                 <CardContent className="p-6 sm:p-8">
                                     <form onSubmit={handleSubmit} className="space-y-6">
-                                        {/* Section: Contact */}
+                                       
                                         <div>
                                             <div className="mb-4 flex items-center justify-between">
                                                 <h3 className="text-sm font-semibold uppercase tracking-wider text-primary">
@@ -539,7 +539,7 @@ export default function ListStationPage() {
                                             </div>
                                         </div>
 
-                                        {/* Section: Basic info */}
+                                       
                                         <div>
                                             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-primary">
                                                 Station Details
@@ -605,7 +605,7 @@ export default function ListStationPage() {
                                             </div>
                                         </div>
 
-                                        {/* Section: Charging */}
+                                       
                                         <div>
                                             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-primary">
                                                 Charging Setup
@@ -695,7 +695,7 @@ export default function ListStationPage() {
                                             </div>
                                         </div>
 
-                                        {/* Section: Location */}
+                                     
                                         <div>
                                             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-primary">
                                                 Location
@@ -753,7 +753,7 @@ export default function ListStationPage() {
                                             </div>
                                         </div>
 
-                                        {/* Section: Description */}
+                                      
                                         <div>
                                             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-primary">
                                                 Additional Details
@@ -836,7 +836,7 @@ export default function ListStationPage() {
                                 </CardContent>
                             </Card>
 
-                            {/* Side panel: live preview & tips */}
+                           
                             <div className="space-y-4 lg:col-span-2 lg:sticky lg:top-24">
                                 <Card className="overflow-hidden border border-slate-200 bg-white shadow-sm">
                                     <CardContent className="p-5">

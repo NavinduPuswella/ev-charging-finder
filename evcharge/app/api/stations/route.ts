@@ -46,7 +46,7 @@ export async function GET(request: Request) {
         const availableOnly = searchParams.get("availableOnly") === "true";
         const all = searchParams.get("all") === "true";
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
         const filter: any = all ? {} : { isApproved: true };
 
         if (city) filter.city = new RegExp(city, "i");

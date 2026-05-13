@@ -334,7 +334,7 @@ export default function AdminSubmissionsPage() {
                             ? {
                                   ...s,
                                   ...data.station,
-                                  ownerId: s.ownerId, // keep populated owner
+                                  ownerId: s.ownerId, 
                               }
                             : s
                     )
@@ -574,7 +574,7 @@ export default function AdminSubmissionsPage() {
                 </div>
             )}
 
-            {/* Edit Dialog */}
+            
             <Dialog
                 open={!!editingId && !!editForm}
                 onOpenChange={(open) => {
@@ -842,7 +842,7 @@ export default function AdminSubmissionsPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Reject Confirmation */}
+            
             <Dialog
                 open={!!rejectId}
                 onOpenChange={(open) => {
@@ -886,7 +886,7 @@ export default function AdminSubmissionsPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Quick reference of approved-but-recent — not needed for now */}
+            
             {pending.length > 0 ? (
                 <Card className="border-dashed">
                     <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-xs text-muted-foreground">

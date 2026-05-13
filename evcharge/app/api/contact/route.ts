@@ -4,7 +4,7 @@ import nodemailer from "nodemailer";
 type MailTransporter = nodemailer.Transporter;
 
 declare global {
-    // eslint-disable-next-line no-var
+    /
     var contactMailTransporter: MailTransporter | undefined;
 }
 

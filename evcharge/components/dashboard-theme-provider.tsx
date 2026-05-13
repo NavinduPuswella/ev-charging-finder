@@ -58,7 +58,7 @@ export function DashboardThemeProvider({ children }: { children: React.ReactNode
             localStorage.removeItem(LEGACY_THEME_STORAGE_KEY);
         });
 
-        // Remove legacy global theme class that used to leak out of dashboard routes.
+        //
         clearLegacyGlobalThemeClass();
 
         return () => {
