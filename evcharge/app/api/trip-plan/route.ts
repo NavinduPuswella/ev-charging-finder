@@ -424,14 +424,21 @@ export async function POST(request: Request) {
             } ${recommendedStation.chargerType} chargers, and offers an estimated total stop cost of LKR ${recommendedStation.totalEstimatedCost.toLocaleString()}.`
             : "No station recommendation could be generated for this route.";
 
-        const safeRangeKm = Math.max(vehicleRangeKm * 0.8, 20);
+        const startUsablePercent = clamp(currentBatteryPercent - targetBatteryPercent, 0, 100);
+        const postChargeUsablePercent = clamp(100 - targetBatteryPercent, 1, 100);
+        const effectiveStartRangeKm = Math.max((vehicleRangeKm * startUsablePercent) / 100, 0);
+        const postChargeRangeKm = Math.max((vehicleRangeKm * postChargeUsablePercent) / 100, 20);
+        const safeRangeKm = postChargeRangeKm;
+
         const plannedStops: RouteStation[] = [];
         const usedStationIds = new Set<string>();
         let currentProgress = 0;
+        let isFirstLeg = true;
 
         for (let i = 0; i < 8; i += 1) {
             const remainingDistanceKm = distanceKm * (1 - currentProgress);
-            if (remainingDistanceKm <= safeRangeKm) break;
+            const legRangeKm = isFirstLeg ? effectiveStartRangeKm : postChargeRangeKm;
+            if (remainingDistanceKm <= legRangeKm) break;
 
             const reachableCandidates = stationsOnRoute
                 .filter((station) => {
@@ -439,22 +446,16 @@ export async function POST(request: Request) {
                     if (station.availableNow <= 0) return false;
                     if (station.progress <= currentProgress + 0.01) return false;
                     const segmentDistance = distanceKm * (station.progress - currentProgress);
-                    return segmentDistance <= safeRangeKm;
+                    return segmentDistance <= legRangeKm;
                 })
                 .sort((a, b) => {
-                    const scoreA =
-                        a.estimatedWaitMinutes * 0.48 +
-                        a.pricePerKwh * 0.32 +
-                        a.distanceToRouteKm * 0.14 -
-                        a.rating * 0.06;
-                    const scoreB =
-                        b.estimatedWaitMinutes * 0.48 +
-                        b.pricePerKwh * 0.32 +
-                        b.distanceToRouteKm * 0.14 -
-                        b.rating * 0.06;
-                    if (Math.abs(scoreA - scoreB) > 0.01) return scoreA - scoreB;
-                    if (Math.abs(b.progress - a.progress) > 0.001) return b.progress - a.progress;
-                    return b.availableNow - a.availableNow;
+                    if (Math.abs(b.progress - a.progress) > 0.005) return b.progress - a.progress;
+                    if (Math.abs(a.distanceFromRouteKm - b.distanceFromRouteKm) > 0.05) {
+                        return a.distanceFromRouteKm - b.distanceFromRouteKm;
+                    }
+                    if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
+                    if (a.connectorMatch !== b.connectorMatch) return a.connectorMatch ? -1 : 1;
+                    return b.rating - a.rating;
                 });
 
             const selected = reachableCandidates[0];
@@ -463,9 +464,40 @@ export async function POST(request: Request) {
             plannedStops.push(selected);
             usedStationIds.add(selected._id);
             currentProgress = selected.progress;
+            isFirstLeg = false;
         }
 
-        const canReachDestination = distanceKm * (1 - currentProgress) <= safeRangeKm;
+        const finalLegRangeKm = plannedStops.length > 0 ? postChargeRangeKm : effectiveStartRangeKm;
+        const canReachDestination = distanceKm * (1 - currentProgress) <= finalLegRangeKm;
+        const chargingStopRequired = distanceKm > effectiveStartRangeKm;
+
+        let finalRoutePath = routePath;
+        let finalDistanceKm = distanceKm;
+        let finalDurationMinutes = durationMinutes;
+        let autoReroutedViaStops = false;
+
+        if (plannedStops.length > 0) {
+            try {
+                const chargingWaypoints = plannedStops
+                    .slice()
+                    .sort((a, b) => a.progress - b.progress)
+                    .map((s) => ({ lat: s.latitude, lng: s.longitude }));
+                const reroutePoints: RoutePoint[] = [
+                    origin,
+                    ...sanitizedWaypoints,
+                    ...chargingWaypoints,
+                    destination,
+                ];
+                const rerouted = await fetchRouteFromOsrm(reroutePoints);
+                finalRoutePath = rerouted.routePath;
+                finalDistanceKm = rerouted.distanceKm;
+                finalDurationMinutes = rerouted.durationMinutes;
+                autoReroutedViaStops = true;
+            } catch {
+                autoReroutedViaStops = false;
+            }
+        }
+
         const aiOptimization = await optimizeRouteWithGemini({
             routeDistanceKm: distanceKm,
             routeDurationMinutes: durationMinutes,
@@ -483,9 +515,16 @@ export async function POST(request: Request) {
             ? recommendedStation.totalEstimatedCost
             : Math.round(usableEnergyKwh * (stationsOnRoute[0]?.chargingRatePerKwh || 0));
 
+        const firstChargingStop = plannedStops[0] || null;
+        const batteryAnalysisNote = !chargingStopRequired
+            ? `Your battery (${currentBatteryPercent}%) provides ~${Math.round(effectiveStartRangeKm)} km of safe range — enough for this ${Math.round(distanceKm)} km trip without charging.`
+            : firstChargingStop
+                ? `Trip distance (${Math.round(distanceKm)} km) exceeds your safe range (~${Math.round(effectiveStartRangeKm)} km at ${currentBatteryPercent}% battery, reserving ${targetBatteryPercent}%). We auto-added ${plannedStops.length} charging stop${plannedStops.length > 1 ? "s" : ""} starting at "${firstChargingStop.name}" (~${Math.round(firstChargingStop.distanceFromStartKm)} km from origin).`
+                : `Trip distance (${Math.round(distanceKm)} km) exceeds your safe range (~${Math.round(effectiveStartRangeKm)} km), but no suitable charging stations were found along the corridor.`;
+
         return NextResponse.json({
-            routeDistanceKm: Math.round(distanceKm * 10) / 10,
-            routeDurationMinutes: Math.round(durationMinutes),
+            routeDistanceKm: Math.round(finalDistanceKm * 10) / 10,
+            routeDurationMinutes: Math.round(finalDurationMinutes),
             estimatedEnergyNeededKwh: Math.round(estimatedEnergyNeededKwh * 100) / 100,
             estimatedTripChargingCost,
             nearestStation,
@@ -493,16 +532,34 @@ export async function POST(request: Request) {
             recommendedStation,
             recommendationReason,
             route: {
-                distanceKm: Math.round(distanceKm * 10) / 10,
-                durationMinutes: Math.round(durationMinutes),
-                routePath,
+                distanceKm: Math.round(finalDistanceKm * 10) / 10,
+                durationMinutes: Math.round(finalDurationMinutes),
+                routePath: finalRoutePath,
+                autoReroutedViaStops,
+                originalDistanceKm: Math.round(distanceKm * 10) / 10,
+            },
+            batteryAnalysis: {
+                startBatteryPercent: currentBatteryPercent,
+                minBatteryPercent: targetBatteryPercent,
+                effectiveStartRangeKm: Math.round(effectiveStartRangeKm * 10) / 10,
+                postChargeRangeKm: Math.round(postChargeRangeKm * 10) / 10,
+                chargingStopRequired,
+                stopsAutoAdded: plannedStops.length,
+                firstStopStationId: firstChargingStop?._id || null,
+                firstStopStationName: firstChargingStop?.name || null,
+                firstStopDistanceFromOriginKm: firstChargingStop
+                    ? Math.round(firstChargingStop.distanceFromStartKm * 10) / 10
+                    : null,
+                note: batteryAnalysisNote,
             },
             safety: {
                 vehicleRangeKm,
                 planningRangeKm: Math.round(safeRangeKm * 10) / 10,
                 canReachDestination,
                 note: canReachDestination
-                    ? "Route can be completed with this stop plan."
+                    ? chargingStopRequired
+                        ? "Route can be completed with the auto-added charging stops."
+                        : "Trip is within range — no charging stop required."
                     : "Could not guarantee destination reach with available stations on this route.",
             },
             stationsOnRoute: stationsOnRoute.slice(0, 40),

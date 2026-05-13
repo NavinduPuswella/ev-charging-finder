@@ -30,11 +30,9 @@ export interface VehicleTypeFallbackConfig {
     maxEfficiencyKmPerKwh: number;
 }
 
-// ---------------------------------------------------------------------------
-// Sri Lanka–focused EV model catalog
-// ---------------------------------------------------------------------------
+
 export const KNOWN_EV_MODELS: EvModelConfig[] = [
-    // ── BYD ────────────────────────────────────────────────────────────────
+    
     {
         id: "byd-atto-1",
         brand: "BYD",
@@ -163,7 +161,7 @@ export const KNOWN_EV_MODELS: EvModelConfig[] = [
         aliases: ["Shark6", "BYD Shark"],
     },
 
-    // ── Nissan ─────────────────────────────────────────────────────────────
+    
     {
         id: "nissan-leaf-ze0",
         brand: "Nissan",
@@ -216,7 +214,7 @@ export const KNOWN_EV_MODELS: EvModelConfig[] = [
         optionalChargingSpeed: 30,
     },
 
-    // ── BMW ────────────────────────────────────────────────────────────────
+
     {
         id: "bmw-i3",
         brand: "BMW",
@@ -266,7 +264,7 @@ export const KNOWN_EV_MODELS: EvModelConfig[] = [
         optionalChargingSpeed: 150,
     },
 
-    // ── MG ─────────────────────────────────────────────────────────────────
+
     {
         id: "mg-zs-ev",
         brand: "MG",
@@ -333,7 +331,7 @@ export const KNOWN_EV_MODELS: EvModelConfig[] = [
         aliases: ["MG S5", "S5"],
     },
 
-    // ── Hyundai ────────────────────────────────────────────────────────────
+    
     {
         id: "hyundai-ioniq-electric",
         brand: "Hyundai",
@@ -387,7 +385,7 @@ export const KNOWN_EV_MODELS: EvModelConfig[] = [
         aliases: ["Ioniq9", "IONIQ9"],
     },
 
-    // ── Kia ────────────────────────────────────────────────────────────────
+    
     {
         id: "kia-niro-ev",
         brand: "Kia",
@@ -426,7 +424,7 @@ export const KNOWN_EV_MODELS: EvModelConfig[] = [
         optionalChargingSpeed: 250,
     },
 
-    // ── Tesla (kept for imported vehicles) ─────────────────────────────────
+
     {
         id: "tesla-model-3-rwd",
         brand: "Tesla",
@@ -441,9 +439,7 @@ export const KNOWN_EV_MODELS: EvModelConfig[] = [
     },
 ];
 
-// ---------------------------------------------------------------------------
-// Vehicle-type fallback validation config (used for custom/unknown vehicles)
-// ---------------------------------------------------------------------------
+
 export const VEHICLE_TYPE_FALLBACK_CONFIG: Record<VehicleType, VehicleTypeFallbackConfig> = {
     "Hatchback EV": {
         vehicleType: "Hatchback EV",
@@ -491,9 +487,7 @@ export const VEHICLE_TYPE_FALLBACK_CONFIG: Record<VehicleType, VehicleTypeFallba
     },
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+
 
 export const getModelLabel = (m: Pick<EvModelConfig, "brand" | "model">) =>
     `${m.brand} ${m.model}`;
