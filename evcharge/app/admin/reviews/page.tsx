@@ -313,7 +313,6 @@ export default function ReviewsPage() {
                 </CardContent>
             </Card>
 
-            {
             <div>
                 <h2 className="text-lg font-semibold mb-3">
                     {hasActiveFilters ? "Filtered" : "All"} Reviews (

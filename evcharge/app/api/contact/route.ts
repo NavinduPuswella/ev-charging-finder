@@ -4,7 +4,6 @@ import nodemailer from "nodemailer";
 type MailTransporter = nodemailer.Transporter;
 
 declare global {
-    /
     var contactMailTransporter: MailTransporter | undefined;
 }
 
